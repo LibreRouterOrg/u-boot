@@ -40,7 +40,7 @@
 #define CFG_MAX_FLASH_BANKS	1	/* max number of memory banks */
 #if (FLASH_SIZE == 16)
 #define CFG_MAX_FLASH_SECT	256	/* max number of sectors on one chip */
-#define ATH_MTDPARTS_MIB0	"8256k(mib0)"
+#define ATH_MTDPARTS_MIB0	"64k(mib0)"
 #elif (FLASH_SIZE == 8)
 #define CFG_MAX_FLASH_SECT	128	/* max number of sectors on one chip */
 #define ATH_MTDPARTS_MIB0	"64k(mib0)"
@@ -190,7 +190,14 @@
 		 */
 #		define MTDPARTS_DEFAULT	"mtdparts=ath-nor0:32k(u-boot1),32k(u-boot2),3008k(rootfs),896k(uImage),64k(mib0),64k(ART)"
 #	else
-#if (FLASH_SIZE == 8) /*FLASH SIZE */
+#if (FLASH_SIZE == 16) /*FLASH SIZE */
+#	define ATH_F_FILE		fs_name(${bc}-jffs2)
+#	define ATH_F_LEN		0xE30000
+#	define ATH_F_ADDR		0x9f050000
+#	define ATH_K_FILE		vmlinux${bc}.lzma.uImage
+#	define ATH_K_ADDR		0x9fe80000
+#	define MTDPARTS_DEFAULT		"mtdparts=ath-nor0:256k(u-boot),64k(u-boot-env),14528k(rootfs),1408k(uImage)," ATH_MTDPARTS_MIB0 ",64k(ART)"
+#elif (FLASH_SIZE == 8)
 #	define ATH_F_FILE		fs_name(${bc}-jffs2)
 #	define ATH_F_LEN		0x630000
 #	define ATH_F_ADDR		0x9f050000
@@ -250,7 +257,9 @@
 #	define CONFIG_BOOTCOMMAND	"nboot 0x81000000 0 0x80000"
 #else
 #	define CFG_ENV_ADDR		0x9f040000
-#if (FLASH_SIZE == 8) /*FLASH_SIZE */
+#if (FLASH_SIZE ==16) /*FLASH_SIZE */
+#	define CONFIG_BOOTCOMMAND	"bootm 0x9fe80000"
+#elif (FLASH_SIZE == 8)
 #	define CONFIG_BOOTCOMMAND	"bootm 0x9f680000"
 #elif  (FLASH_SIZE == 4)
 #	define CONFIG_BOOTCOMMAND	"bootm 0x9f300000"
