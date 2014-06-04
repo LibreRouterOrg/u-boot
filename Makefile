@@ -3272,6 +3272,13 @@ ifneq (,$(findstring $(CFG_BOARD_TYPE), ap152 tb755)) #{
 	@echo '#define CONFIG_ATHRS_GMAC_SGMII  1'      >>include/config.h
 	@echo '#define ATH_S17_MAC0_SGMII	1'	>>include/config.h
 endif #}
+ifeq ($(ATH_DUAL_FLASH),1)
+	@echo '#define CONFIG_ATH_NAND_SUPPORT	1'	>>include/config.h
+ifeq ($(ATH_SPI_NAND),1)
+	@echo '#define ATH_SPI_NAND		1'	>>include/config.h
+	@echo '#define CONFIG_ATH_SPI_NAND_CS_GPIO  $(ATH_SPI_NAND_CS_GPIO) '>> include/config.h
+endif
+endif
 
 ifneq (,$(findstring $(CFG_BOARD_TYPE), ap152)) #{
 	@echo '#define UART_RX18_TX22           1'      >>include/config.h

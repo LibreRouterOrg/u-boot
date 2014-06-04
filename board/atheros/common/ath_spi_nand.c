@@ -1,0 +1,998 @@
+/*
+ * Copyright (c) 2014 Qualcomm Atheros, Inc.
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ */
+/*
+ * linux/drivers/mtd/nand/ath_spi_nand.c
+ * vim: tabstop=8 : noexpandtab
+ * Derived from atheros nand driver.
+ */
+#include <common.h>
+#include <command.h>
+#include <asm/addrspace.h>
+#include <asm/io.h>
+#include <asm/types.h>
+#include <config.h>
+#include <atheros.h>
+#include <malloc.h>
+
+#include <linux/types.h>
+#include <linux/string.h>
+#include <linux/bitops.h>
+
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/nand.h>
+#include <linux/mtd/nand_ecc.h>
+#include "ath_spi.h"
+
+#define ENOMEM		12
+#define EINVAL		22
+#define EIO		5
+#define ETIMEDOUT       110
+#define EUCLEAN         117
+
+
+#define writesize	oobblock
+
+#define DRV_NAME	"ath-spi-nand"
+#define DRV_VERSION	"0.1"
+#define DRV_AUTHOR	"Qualcomm Atheros"
+#define DRV_DESC	"Qualcomm Atheros SPI NAND Driver"
+
+#define ATH_SPI_NAND_CMD_WRITE_ENABLE		0x06
+#define ATH_SPI_NAND_CMD_WRITE_DISABLE		0x04
+#define ATH_SPI_NAND_CMD_GET_FEATURE		0x0f
+#define ATH_SPI_NAND_CMD_SET_FEATURE		0x1f
+#define ATH_SPI_NAND_CMD_PAGE_READ_TO_CACHE	0x13
+#define ATH_SPI_NAND_CMD_READ_FROM_CACHE	0x03
+#define ATH_SPI_NAND_CMD_READ_ID		0x9f
+#define ATH_SPI_NAND_CMD_BLOCK_ERASE		0xd8
+#define ATH_SPI_NAND_CMD_RESET			0xff
+#define ATH_SPI_NAND_CMD_PROGRAM_LOAD		0x02
+#define ATH_SPI_NAND_CMD_PROGRAM_EXECUTE	0x10
+
+#define ATH_SPI_NAND_BLK_PROT			0xa0
+#define ATH_SPI_NAND_BP_BRWD			(1 << 7)
+#define ATH_SPI_NAND_BP_BP2			(1 << 5)
+#define ATH_SPI_NAND_BP_BP1			(1 << 4)
+#define ATH_SPI_NAND_BP_BP0			(1 << 3)
+#define ATH_SPI_NAND_BP_INV			(1 << 2)
+#define ATH_SPI_NAND_BP_CMP			(1 << 1)
+#define ATH_SPI_NAND_BP_MASK			(ATH_SPI_NAND_BP_BP2 |	\
+						 ATH_SPI_NAND_BP_BP1 |	\
+						 ATH_SPI_NAND_BP_BP0 |	\
+						 ATH_SPI_NAND_BP_INV |	\
+						 ATH_SPI_NAND_BP_CMP)
+
+#define ATH_SPI_NAND_FEAT			0xb0
+#define ATH_SPI_NAND_FEAT_OTP_PRT		(1 << 7)
+#define ATH_SPI_NAND_FEAT_OTP_EN		(1 << 6)
+#define ATH_SPI_NAND_FEAT_ECC_EN		(1 << 4)
+#define ATH_SPI_NAND_FEAT_QE			(1 << 0)
+
+#define ATH_SPI_NAND_STATUS			0xc0
+#define ATH_SPI_NAND_STATUS_ECCS1		(1 << 5)
+#define ATH_SPI_NAND_STATUS_ECCS0		(1 << 4)
+#define get_eccs(x)				(((x) >> 4) & 0x3)
+#define ASNS_ECC_ERR_NONE			0
+#define ASNS_ECC_ERR_CORR_1_7			1
+#define ASNS_ECC_ERR_UNCORR			2
+#define ASNS_ECC_ERR_CORR_8			3
+#define ATH_SPI_NAND_STATUS_P_FAIL		(1 << 3)
+#define ATH_SPI_NAND_STATUS_E_FAIL		(1 << 2)
+#define ATH_SPI_NAND_STATUS_WEL			(1 << 1)
+#define ATH_SPI_NAND_STATUS_OIP			(1 << 0)
+
+#define ATH_NAND_IO_DBG				0
+#define ATH_NAND_OOB_DBG			0
+#define ATH_NAND_IN_DBG				0
+
+#if ATH_NAND_IO_DBG
+#	define iodbg	printk
+#	define oobdbg	printk
+#else
+#	define iodbg(...)
+#	define oobdbg(...)
+#endif
+
+#if ATH_NAND_IN_DBG
+#	define indbg(a, ...)					\
+	do {							\
+		printk("--- %s(%d):" a "\n",			\
+			__func__, __LINE__, ## __VA_ARGS__);	\
+	} while (0)
+#else
+#	define indbg(...)
+#	define indbg1(a, ...)					\
+	do {							\
+		printk("--- %s(%d):" a "\n",			\
+			__func__, __LINE__, ## __VA_ARGS__);	\
+	} while (0)
+#endif
+
+#define ATH_SPI_NAND_CE_LOW		(ATH_SPI_CS_ENABLE_1 & ~ATH_SPI_CLK_HIGH)
+#define ATH_SPI_NAND_CE_HIGH		(ATH_SPI_CS_ENABLE_1 | ATH_SPI_CLK_HIGH)
+
+#define ath_spi_nand_bit_banger(__b)	\
+	ath_spi_bit_banger(ATH_SPI_NAND_CE_LOW, ATH_SPI_NAND_CE_HIGH, __b)
+#define ath_spi_nand_go()	ath_spi_go(ATH_SPI_NAND_CE_LOW)
+#define ath_spi_nand_send_addr(__a)	\
+	ath_spi_send_addr(ATH_SPI_NAND_CE_LOW, ATH_SPI_NAND_CE_HIGH, __a)
+#define ath_spi_nand_read_byte()	\
+	ath_spi_bit_banger(ATH_SPI_NAND_CE_LOW, ATH_SPI_NAND_CE_HIGH, 0)
+
+#define ath_spi_nand_start()					\
+do {								\
+	ath_reg_wr(ATH_SPI_WRITE, ATH_SPI_CS_DIS);		\
+	ath_reg_wr(ATH_SPI_WRITE, ATH_SPI_NAND_CE_LOW);		\
+} while (0)
+
+#define ath_spi_nand_end()					\
+do {								\
+	ath_reg_wr(ATH_SPI_WRITE, ATH_SPI_NAND_CE_LOW);		\
+	ath_reg_wr(ATH_SPI_WRITE, ATH_SPI_CS_DIS);		\
+} while (0)
+
+/* ath nand info */
+typedef struct {
+	/* mtd info */
+	struct mtd_info		*mtd;
+
+	unsigned int		page_size;
+
+	/* NAND MTD partition information */
+	int			nr_partitions;
+	struct mtd_partition	*partitions;
+} ath_spi_nand_sc_t;
+
+ath_spi_nand_sc_t ath_spi_nand_sc;
+
+struct mtd_info nand_info[CFG_MAX_NAND_DEVICE];
+int nand_curr_device = 0;
+
+static unsigned long
+ath_parse_read_id(ath_spi_nand_sc_t *sc)
+{
+	uint32_t id;
+
+#define ATH_GIGA_SPI_NAND_V_ID			0xc8
+#define ATH_GIGA_SPI_NAND_D_ID			0xf1
+#define get_ath_spi_nand_vendor(x)		(((x) >> 8) & 0xff)
+#define get_ath_spi_nand_device(x)		((x) & 0xff)
+
+	ath_spi_nand_start();
+	ath_spi_nand_bit_banger(0x9F); //send cmd to spi nand
+	ath_spi_nand_bit_banger(0x00);
+
+	ath_spi_nand_read_byte();
+	ath_spi_nand_read_byte();
+	ath_spi_nand_end();
+
+	id = ath_reg_rd(ATH_SPI_RD_STATUS);
+
+	printk("%s: SPI NAND V.Id: 0x%x D.Id: 0x%x\n", __func__,
+		get_ath_spi_nand_vendor(id), get_ath_spi_nand_device(id));
+
+	if ((get_ath_spi_nand_vendor(id) != ATH_GIGA_SPI_NAND_V_ID) ||
+	    (get_ath_spi_nand_device(id) != ATH_GIGA_SPI_NAND_D_ID))
+		return 1;
+
+	return 0;
+}
+
+int
+nand_read_raw (struct mtd_info *mtd, uint8_t *buf, loff_t from, size_t len, size_t ooblen)
+{
+	return 0;
+}
+
+
+static void
+ath_gpio_config_output(int gpio)
+{
+#if defined(CONFIG_MACH_AR934x) || \
+    defined(CONFIG_MACH_QCA955x) || \
+    defined(CONFIG_MACH_QCA953x) || \
+        defined(CONFIG_MACH_QCA956x)
+        ath_reg_rmw_clear(ATH_GPIO_OE, (1 << gpio));
+#else
+        ath_reg_rmw_set(ATH_GPIO_OE, (1 << gpio));
+#endif
+}
+
+static void
+ath_gpio_set_fn(int gpio, int fn)
+{
+#define gpio_fn_reg(x)  ((x) / 4)
+#define gpio_lsb(x)     (((x) % 4) * 8)
+#define gpio_msb(x)     (gpio_lsb(x) + 7)
+#define gpio_mask(x)    (0xffu << gpio_lsb(x))
+#define gpio_set(x, f)  (((f) & 0xffu) << gpio_lsb(x))
+
+        uint32_t *reg = ((uint32_t *)GPIO_OUT_FUNCTION0_ADDRESS) +
+                                        gpio_fn_reg(gpio);
+
+        ath_reg_wr(reg, (ath_reg_rd(reg) & ~gpio_mask(gpio)) | gpio_set(gpio, fn));
+}
+
+
+int
+ath_spi_nand_set_feature(uint32_t addr, uint8_t val)
+{
+	if ((addr != ATH_SPI_NAND_BLK_PROT) &&
+	    (addr != ATH_SPI_NAND_FEAT) &&
+	    (addr != ATH_SPI_NAND_STATUS))
+		return -EINVAL;
+
+	ath_spi_nand_start();
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_SET_FEATURE);
+	ath_spi_nand_bit_banger(addr);
+	ath_spi_nand_bit_banger(val);
+	ath_spi_nand_end();
+	return 0;
+}
+
+int
+ath_spi_nand_get_feature(uint8_t addr)
+{
+	uint32_t ret;
+
+	if ((addr != ATH_SPI_NAND_BLK_PROT) &&
+	    (addr != ATH_SPI_NAND_FEAT) &&
+	    (addr != ATH_SPI_NAND_STATUS))
+		return -EINVAL;
+
+	ath_spi_nand_start();
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_GET_FEATURE);
+	ath_spi_nand_bit_banger(addr);
+	ath_spi_nand_read_byte();
+	ret = ath_reg_rd(ATH_SPI_RD_STATUS);
+	ath_spi_nand_end();
+	return (ret & 0xff);
+}
+
+static int
+ath_spi_nand_status(ath_spi_nand_sc_t *sc)
+{
+	int i, status;
+	/*
+	 * Per the Giga Device GD5F1GQ4UAYIG data sheet, time taken for the
+	 * following operations are:
+	 *	Page Program time: 400us typical
+	 *	Block Erase time: 3ms typical
+	 *	Page read time: 120us maximum(w/I ECC)
+	 *
+	 * Set 'max' to maximum of the above
+	 */
+	const int max = 300;
+
+	ath_spi_nand_start();
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_GET_FEATURE);
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_STATUS);
+
+	for (i = 0; i < max; i++) {
+		ath_spi_nand_read_byte();
+		status = ath_reg_rd(ATH_SPI_RD_STATUS);
+		if (status & ATH_SPI_NAND_STATUS_OIP)
+			udelay(10);
+		else
+			break;
+	}
+
+	ath_spi_nand_end();
+
+	if (max == i) {
+		printk("%s: Operation timed out\n", __func__);
+		return -ETIMEDOUT;
+	}
+
+	return (status & 0xff);
+}
+
+static int
+ath_spi_nand_ecc(ath_spi_nand_sc_t *sc, int on)
+{
+	uint32_t feat;
+	char *msg[] = { "dis", "en" };
+
+	feat = ath_spi_nand_get_feature(ATH_SPI_NAND_FEAT);
+
+	if (on) {
+		/* Enable internal ECC */
+		ath_spi_nand_set_feature(ATH_SPI_NAND_FEAT,
+					feat | ATH_SPI_NAND_FEAT_ECC_EN);
+		feat = ATH_SPI_NAND_FEAT_ECC_EN;
+	} else {
+		feat &= ~ATH_SPI_NAND_FEAT_ECC_EN;
+		ath_spi_nand_set_feature(ATH_SPI_NAND_FEAT, feat);
+	}
+
+	udelay(1);
+
+	if ((ath_spi_nand_get_feature(ATH_SPI_NAND_FEAT) & feat) != feat) {
+		printk("%s: Couldn't %sable internal ECC\n", __func__, msg[on]);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+inline int
+ath_spi_nand_reset(ath_spi_nand_sc_t *sc)
+{
+	int i;
+
+	ath_spi_nand_start();
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_RESET);
+	ath_spi_nand_end();
+	for (i = 0; i < 0x1000000; i++);
+	if (ath_spi_nand_status(sc) == -ETIMEDOUT) {
+		printk("%s: Device reset failed\n", __func__);
+		return -ETIMEDOUT;
+	}
+	return 0;
+}
+
+static int
+ath_spi_nand_hw_init(ath_spi_nand_sc_t *sc)
+{
+	uint32_t i;
+	ulong addr,  value;
+#define ATH_GPIO_FN_SPI_CS1		0x25 /* set to SPI_CS1(0x25), see GPIO OUTPUT SELECT VALUES in design document */ 
+
+#if (CONFIG_ATH_SPI_NAND_CS_GPIO == 14)
+	ath_reg_rmw_set( GPIO_FUNCTION_ADDRESS,GPIO_FUNCTION_DISABLE_JTAG_SET(1));/* Disable Jtag */
+#endif 
+	ath_gpio_set_fn(CONFIG_ATH_SPI_NAND_CS_GPIO, ATH_GPIO_FN_SPI_CS1);
+	ath_gpio_config_output(CONFIG_ATH_SPI_NAND_CS_GPIO);
+
+	if ((i = ath_spi_nand_reset(sc))) {
+		return i;
+	}
+
+	/* Unprotect all blocks */
+	ath_spi_nand_set_feature(ATH_SPI_NAND_BLK_PROT, 0);
+	if (ath_spi_nand_get_feature(ATH_SPI_NAND_BLK_PROT) &
+		ATH_SPI_NAND_BP_MASK) {
+		printk("%s: Block Unprotect failed\n", __func__);
+		return -EIO;
+	}
+	return ath_spi_nand_ecc(sc, 1);
+}
+
+static inline void
+ath_spi_nand_cmd_page_read_to_cache(loff_t page)
+{
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_PAGE_READ_TO_CACHE);
+	ath_spi_nand_bit_banger((page >> 16) & 0xff);
+	ath_spi_nand_bit_banger((page >>  8) & 0xff);
+	ath_spi_nand_bit_banger((page >>  0) & 0xff);
+}
+
+static inline void
+ath_spi_nand_cmd_read_from_cache(int start, int len, u_char *buf)
+{
+	int byte;
+
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_READ_FROM_CACHE);
+	ath_spi_nand_bit_banger((start >> 8) & 0xff);
+	ath_spi_nand_bit_banger((start >> 0) & 0xff);
+	ath_spi_nand_bit_banger(0);	/* dummy byte */
+
+	for (byte = 0; byte < len; byte++) {
+		ath_spi_nand_bit_banger(0);	/* dummy byte */
+		buf[byte] = ath_reg_rd(ATH_SPI_RD_STATUS) & 0xff;
+	}
+}
+
+/*
+ * Assumes:
+ * If 'buf' pointer is NULL, assumes it to be a bad block marker check
+ */
+int
+ath_spi_nand_page_read(struct mtd_info *mtd, loff_t off, u_char *buf, int len)
+{
+	u_char tmp;
+	loff_t page = off >> mtd->writesize_shift;
+	int status, byte, ret = 0, eccfail = 0;
+
+	ath_spi_nand_start();
+	ath_spi_nand_cmd_page_read_to_cache(page);
+	ath_spi_nand_end();
+
+	status = ath_spi_nand_status(mtd->priv);
+
+	if (status == -ETIMEDOUT)
+		return status;
+
+	if (!buf) {
+		iodbg("bbm check\n");
+		/*
+		 * Trying to read bad block marker
+		 * BBM is available at end of page. Since we want
+		 * to look into the spare area for the BBM, we set the
+		 * wrap configuration to 00'b OR-ed with offset page size.
+		 */
+		byte = mtd->writesize;
+		len  = 1;
+		buf = &tmp;
+	} else {
+		iodbg("page read\n");
+		byte = off & mtd->writesize_mask;
+
+		if (get_eccs(status) == ASNS_ECC_ERR_UNCORR) {
+			eccfail = 1;
+		}
+
+		if (get_eccs(status) != ASNS_ECC_ERR_NONE) {
+			ret = -EUCLEAN;
+		}
+
+	}
+
+	ath_spi_nand_start();
+	ath_spi_nand_cmd_read_from_cache(byte, len, buf);
+	ath_spi_nand_end();
+
+	if (buf == &tmp) {
+		/* BBM check */
+		if (tmp != 0xff)
+			return 1;	/* Bad Block */
+		else
+			return 0;	/* NOT a Bad Block */
+	}
+
+	/* Detect erased pages */
+	if (eccfail) {
+		for (byte = 0; byte < mtd->writesize &&
+				buf[byte] == 0xff; byte ++);
+		if (byte < mtd->writesize) {
+			printk("%s: ECC error 0x%x\n", __func__, status);
+			return -EIO;
+		}
+	}
+
+	return ret;
+}
+
+int
+ath_spi_nand_write_enable(const char *f)
+{
+	ath_spi_nand_start();
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_WRITE_ENABLE);
+	ath_spi_nand_end();
+	if (!(ath_spi_nand_get_feature(ATH_SPI_NAND_STATUS) &
+			ATH_SPI_NAND_STATUS_WEL)) {
+		printk("%s: Write enable failed\n", f);
+		return -EIO;
+	}
+	return 0;
+}
+
+void
+ath_spi_nand_write_disable(const char *f)
+{
+	ath_spi_nand_start();
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_WRITE_DISABLE);
+	if (ath_spi_nand_get_feature(ATH_SPI_NAND_STATUS) &
+			ATH_SPI_NAND_STATUS_WEL) {
+		printk("%s: Write disable failed\n", f);
+	}
+	ath_spi_nand_end();
+}
+
+static inline void
+ath_spi_nand_cmd_program_load(void)
+{
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_PROGRAM_LOAD);
+	/*
+	 * Since we assume page aligned writes, set the starting
+	 * byte offset as zero
+	 */
+	ath_spi_nand_bit_banger(0);	/* Starting byte offset */
+	ath_spi_nand_bit_banger(0);
+}
+
+static inline void
+ath_spi_nand_cmd_program_execute(loff_t page)
+{
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_PROGRAM_EXECUTE);
+	ath_spi_nand_bit_banger((page >> 16) & 0xff);
+	ath_spi_nand_bit_banger((page >>  8) & 0xff);
+	ath_spi_nand_bit_banger((page >>  0) & 0xff);
+}
+
+/*
+ * Assumes:
+ *	- page aligned addresses
+ *	- Write size is equal to page size
+ *	- 'len' argument is ignored
+ */
+int
+ath_spi_nand_page_write(struct mtd_info *mtd, loff_t off, u_char *buf, int len)
+{
+	loff_t page = off >> mtd->writesize_shift;
+	int byte, ret = 0, status;
+
+	ath_spi_nand_start();
+	ath_spi_nand_cmd_program_load();
+
+
+	/* Load the data bytes into internal cache */
+	for (byte = 0; byte < len; byte++)
+		ath_spi_nand_bit_banger(buf[byte]);
+
+	/* Load the rest of the bytes in the cache with 0xff */
+	for (; byte < mtd->writesize; byte++)
+		ath_spi_nand_bit_banger(0xff);
+
+	ath_spi_nand_end();
+
+	if ((ret = ath_spi_nand_write_enable(__func__)) != 0) {
+		return -EIO;
+	}
+
+	ath_spi_nand_start();
+	ath_spi_nand_cmd_program_execute(page);
+	ath_spi_nand_end();
+
+	status = ath_spi_nand_status(mtd->priv);
+
+	if (status == -ETIMEDOUT)
+		ret = -ETIMEDOUT;
+
+	if (status & ATH_SPI_NAND_STATUS_P_FAIL) {
+		printk("%s: Program error 0x%x\n", __func__, status);
+		ret = -EIO;
+	}
+
+	ath_spi_nand_write_disable(__func__);
+
+	return ret;
+}
+
+int
+ath_spi_nand_block_isbad(struct mtd_info *mtd, loff_t off)
+{
+	int ret;
+	loff_t page = (off & ~mtd->erasesize_mask);
+
+	ret = ath_spi_nand_page_read(mtd, page, NULL, 1);
+
+	return ret;
+
+}
+
+static int
+ath_spi_nand_rw_buff(struct mtd_info *mtd, int rd, uint8_t *buf,
+		loff_t addr, size_t len, size_t *iodone)
+{
+	uint8_t *ptr = buf;
+	int ret, num;
+	int off, euclean = 0;
+	typedef int (*op)(struct mtd_info *, loff_t, u_char *, int);
+
+	op rw[] = { ath_spi_nand_page_write, ath_spi_nand_page_read };
+
+	num = ((len + (addr & mtd->writesize_mask)) + mtd->writesize_mask)
+						>> mtd->writesize_shift;
+
+	*iodone = 0;
+
+	/*
+	 * Writes to non-page-aligned addresses not allowed
+	 */
+	if (!rd && (addr & mtd->writesize_mask)) {
+		printk("%s: Unaligned write to: 0x%llx\n", __func__, addr);
+		return -EINVAL;
+	}
+
+	while (num) {
+		int l;
+		ret = ath_spi_nand_block_isbad(mtd, addr);
+		if ((ret == -ETIMEDOUT) || (ret == -EIO))
+			return ret;
+
+		if (ret == 1) {
+			printk("Skipping bad block[0x%x]\n", (unsigned)addr);
+			addr = (addr & mtd->erasesize_mask) + mtd->erasesize;
+			continue;
+		}
+
+		l = (len > mtd->writesize) ? mtd->writesize : len;
+		off = (addr & mtd->writesize_mask);
+		if ((off + l) > mtd->writesize)
+			l = mtd->writesize - off;
+
+		ret = rw[rd](mtd, addr, ptr, l);
+
+		if ((ret == -ETIMEDOUT) || (ret == -EIO))
+			return ret;
+
+		if (ret == -EUCLEAN)
+			euclean = 1;
+
+		len -= l;
+		*iodone += l;
+		ptr += l;
+		addr += l;
+		num--;
+	}
+
+	return euclean ? -EUCLEAN : 0;
+}
+
+static int
+ath_spi_nand_write(struct mtd_info *mtd, loff_t to, size_t len,
+		size_t *retlen, const u_char *buf)
+{
+	int	ret;
+
+	if (!len || !retlen) return (0);
+
+	indbg("0x%llx	%u", to, len);
+
+	ath_spi_fs(1);	// Enable access to SPI controller
+	ret = ath_spi_nand_rw_buff(mtd, 0 /* write */, (u_char *)buf, to, len, retlen);
+	ath_spi_fs(0);	// Disable access to SPI controller
+
+	return ret;
+}
+
+static int
+ath_spi_nand_read(struct mtd_info *mtd, loff_t from, size_t len,
+		size_t *retlen, u_char *buf)
+{
+	int	ret;
+
+	if (!len || !retlen) return (0);
+
+	indbg("0x%llx	%u", from, len);
+
+	ath_spi_fs(1);	// Enable access to SPI controller
+	ret = ath_spi_nand_rw_buff(mtd, 1 /* read */, buf, from, len, retlen);
+	ath_spi_fs(0);	// Disable access to SPI controller
+
+	return ret;
+}
+
+/*
+ * RA: Row Address. RA<5:0> selects a page inside a block,
+ *		and RA<15:6> selects a block.
+ */
+#define block_to_ra(b) ((b) << 6)
+#define ra_to_block(r) ((r) >> 6)
+
+static inline int
+ath_spi_nand_block_erase(ath_spi_nand_sc_t *sc, loff_t block)
+{
+	struct mtd_info *mtd = sc->mtd;
+	uint32_t row_addr;
+	int ret = 0, status;
+
+	if ((ret = ath_spi_nand_write_enable(__func__)) != 0) {
+		return -EIO;
+	}
+
+	row_addr = block_to_ra(block >> mtd->erasesize_shift);
+
+	ath_spi_nand_start();
+	ath_spi_nand_bit_banger(ATH_SPI_NAND_CMD_BLOCK_ERASE);
+	ath_spi_nand_bit_banger((row_addr >> 16) & 0xff);
+	ath_spi_nand_bit_banger((row_addr >>  8) & 0xff);
+	ath_spi_nand_bit_banger((row_addr >>  0) & 0xff);
+	ath_spi_nand_end();
+
+	status = ath_spi_nand_status(mtd->priv);
+
+	if (status == -ETIMEDOUT)
+		ret = -ETIMEDOUT;
+
+	if (status & ATH_SPI_NAND_STATUS_E_FAIL) {
+		printk("%s: Block Erase error\n", __func__);
+		ret = -EIO;
+	}
+
+	ath_spi_nand_write_disable(__func__);
+
+	return ret;
+}
+
+
+static int
+ath_spi_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
+{
+	ulong		s_first, i;
+	unsigned	n, j;
+	int		ret = 0, bad = 0;
+	ath_spi_nand_sc_t	*sc = mtd->priv;
+
+	if (instr->addr + instr->len > mtd->size) {
+		return (-EINVAL);
+	}
+
+	s_first = instr->addr;
+	n = instr->len >> mtd->erasesize_shift;
+	if (instr->len & mtd->erasesize_mask) n ++;
+
+	ath_spi_fs(1);	// Enable access to SPI controller
+	for (j = 0, i = s_first; j < n; j++, i += mtd->erasesize) {
+		if (ath_spi_nand_block_isbad(mtd, i)) {
+			bad ++;
+			continue;
+		}
+
+		if ((ret = ath_spi_nand_block_erase(sc, i)) != 0) {
+			iodbg("%s: erase failed 0x%llx 0x%llx 0x%x %llu "
+				"%lx %lx\n", __func__, instr->addr, s_last,
+				mtd->erasesize, i, ba1, ba0);
+			break;
+		}
+	}
+	ath_spi_fs(0);	// Disable access to SPI controller
+
+	if (instr->callback) {
+		if ((j < n) || bad) {
+			instr->state = MTD_ERASE_FAILED;
+		} else {
+			instr->state = MTD_ERASE_DONE;
+		}
+		mtd_erase_callback(instr);
+	}
+
+	return ret;
+}
+
+
+static int ath_spi_nand_remove(void)
+{
+	return 0;
+}
+
+/*
+ * Layout of data and spare regions on the Giga NAND SPI device
+ * ________________________________________________________
+ * Start	End	ECC	Area		Description
+ * --------------------------------------------------------
+ * 0x000	0x1ff	Yes	Main 0		User data 0
+ * 0x200	0x3ff	Yes	Main 1		User data 1
+ * 0x400	0x5ff	Yes	Main 2		User data 2
+ * 0x600	0x7ff	Yes	Main 3		User data 3
+ *
+ * 0x800	0x803	No	Spare 0		Bad Block Marker
+ *
+ * 0x804	0x80b	Yes	Spare 0		User meta data II
+ * 0x80c	0x80f	--	Spare 0		ECC parity data
+ *
+ * 0x810	0x813	No	Spare 1		User meta data I
+ * 0x814	0x81b	Yes	Spare 1		User meta data II
+ * 0x81c	0x81f	--	Spare 1		ECC parity data
+ *
+ * 0x820	0x823	No	Spare 2		User meta data I
+ * 0x824	0x82b	Yes	Spare 2		User meta data II
+ * 0x82c	0x82f	--	Spare 2		ECC parity data
+ *
+ * 0x830	0x833	No	Spare 3		User meta data I
+ * 0x834	0x83b	Yes	Spare 3		User meta data II
+ * 0x83c	0x83f	--	Spare 3		ECC parity data
+ */
+#if 0
+static struct nand_ecclayout ath_spi_nand_oob = {
+	.eccbytes	= 16,
+	.eccpos		= { 12, 13, 14, 15, 28, 29, 30, 31,
+			    44, 45, 46, 47, 60, 61, 62, 63 },
+	.oobavail	= 32,
+	.oobfree	= { { 4, 8 }, { 20, 8 }, { 36, 8 }, { 52, 8 } },
+};
+
+static int
+ath_spi_nand_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
+{
+	oobdbg(	"%s: from: 0x%llx mode: 0x%x len: 0x%x retlen: 0x%x\n"
+		"ooblen: 0x%x oobretlen: 0x%x ooboffs: 0x%x datbuf: %p "
+		"oobbuf: %p\n", __func__, from,
+		ops->mode, ops->len, ops->retlen, ops->ooblen,
+		ops->oobretlen, ops->ooboffs, ops->datbuf,
+		ops->oobbuf);
+
+	indbg("0x%llx %p %p %u", from, ops->oobbuf, ops->datbuf, ops->len);
+
+	return 0; //ath_spi_nand_rw_oob(mtd, 1 /* read */, from, ops);
+}
+#endif
+
+#define ath_spi_nand_debug	0
+#if ath_spi_nand_debug
+void
+ath_nand_dump_buf(loff_t addr, void *v, unsigned count)
+{
+	unsigned	*buf = v,
+			*end = buf + (count / sizeof(*buf));
+
+	printk("____ Dumping %d bytes at 0x%p 0x%llx_____\n", count, buf, addr);
+
+	for (; buf && buf < end; buf += 4, addr += 16) {
+		printk("%08llx: %08x %08x %08x %08x\n",
+			addr, buf[0], buf[1], buf[2], buf[3]);
+	}
+	printk("___________________________________\n");
+}
+
+u_char buf[4 * 4096];
+
+
+void noinline
+ath_spi_nand_read_test(ath_spi_nand_sc_t *sc, struct mtd_info *mtd, loff_t addr, int len)
+{
+	size_t retlen;
+	int ret;
+
+	memset(buf, 0xa5, sizeof(buf));
+
+	ret = ath_spi_nand_read(mtd, addr, len, &retlen, buf);
+	printk("%s: read ret = %d %d\n", __func__, ret, retlen);
+	if (ret == 0) {
+		ath_nand_dump_buf(addr, buf,
+			(len + mtd->writesize_mask) & ~mtd->writesize_mask);
+	}
+}
+
+
+void
+ath_spi_nand_test(ath_spi_nand_sc_t *sc, struct mtd_info *mtd)
+{
+	int ret, retlen;
+
+	ath_spi_nand_read_test(sc, mtd, 0x80000, 4096);
+
+	//ath_spi_nand_ecc(sc, 1);
+
+	if (ath_spi_nand_block_erase(sc, 0))
+		printk("erase failed\n");
+
+	//Addr/Len (aligned or unaligned)/num (single or multi page)
+	ath_spi_nand_read_test(sc, mtd, 0, 2048);	// a/a/s
+	ath_spi_nand_read_test(sc, mtd, 0, 4096);	// a/a/m
+	ath_spi_nand_read_test(sc, mtd, 0x80000 + 1024, 1024);	// u/a/s
+	ath_spi_nand_read_test(sc, mtd, 0x80000 + 1000, 4096);	// u/a/m
+	ath_spi_nand_read_test(sc, mtd, 0x80000 + 4096, 1000);	// a/u/s
+	ath_spi_nand_read_test(sc, mtd, 0x80000 + 4096, 3000);	// a/u/m
+	ath_spi_nand_read_test(sc, mtd, 0x80000 + 1000, 500);	// u/u/s
+	ath_spi_nand_read_test(sc, mtd, 0x80000 + 1000, 3000);	// u/u/m
+	ret = ath_spi_nand_write(mtd, 0, 2048, &retlen, buf);
+	if (ret == 0)
+		printk("Write success\n");
+	else
+		printk("Write failed %d\n", ret);
+
+	ret = ath_spi_nand_read(mtd, 0, 2048, &retlen, buf);
+
+	printk("%s: read ret = %d %d\n", __func__, ret, retlen);
+	if (ret == 0)
+		ath_nand_dump_buf(0, buf, 2048);
+
+	ath_reg_wr(0xb806001c, -1);
+}
+
+void
+ath_spi_nand_scan(ath_spi_nand_sc_t *sc, struct mtd_info *mtd)
+{
+	int i, retlen;
+
+	for (i = 0; i < (mtd->size >> mtd->erasesize_shift); i++)
+		ath_spi_nand_read(mtd, i << mtd->erasesize_shift,
+					2048, &retlen, buf);
+}
+
+#else
+#define ath_spi_nand_test(...)	/* nothing */
+#define ath_spi_nand_scan(...)	/* nothing */
+#endif
+
+
+/*
+ * ath_spi_nand_probe
+ *
+ * called by device layer when it finds a device matching
+ * one our driver can handled. This code checks to see if
+ * it can allocate all necessary resources then calls the
+ * nand layer to look for devices
+ */
+static int ath_spi_nand_probe(void)
+{
+	ath_spi_nand_sc_t	*sc = NULL;
+	struct mtd_info		*mtd = NULL;
+	int			err = 0;
+
+	/* initialise the hardware */
+	err = ath_spi_nand_hw_init(sc);
+	if (err) {
+		goto out_err_hw_init;
+	}
+
+	/* initialise mtd sc data struct */
+	if (ath_parse_read_id(sc)) {
+		goto out_err_hw_init;
+	}
+	sc = &ath_spi_nand_sc;
+	sc->mtd = &nand_info[nand_curr_device];
+	mtd = sc->mtd;
+
+
+	mtd->size		= (128 << 20);
+	mtd->name		= DRV_NAME;
+
+	mtd->writesize_shift	= 11;
+	mtd->writesize		= (1 << mtd->writesize_shift);
+	mtd->writesize_mask	= (mtd->writesize - 1);
+
+	mtd->erasesize_shift	= 17;
+	mtd->erasesize		= (1 << mtd->erasesize_shift);
+	mtd->erasesize_mask	= (mtd->erasesize - 1);
+
+	mtd->oobsize		= 64;
+	mtd->oobavail		= 32;
+
+	/*
+	 * Presently, we use the internal ECC provided by the flash
+	 * device itself. Hence, though this is a NAND device,
+	 * we expose it as NOR Flash.
+	 *
+	 * Since we expose it as NOR flash, we don't have to supply
+	 * the xxx_oob functions and related functionality.
+	 */
+	mtd->type		= MTD_NORFLASH;
+	mtd->flags		= MTD_WRITEABLE;
+
+	mtd->read		= ath_spi_nand_read;
+	mtd->write		= ath_spi_nand_write;
+	mtd->erase		= ath_spi_nand_erase;
+
+	//mtd->read_oob		= ath_spi_nand_read_oob;
+	//mtd->write_oob		= ath_spi_nand_write_oob;
+
+	//mtd->block_isbad	= ath_spi_nand_block_isbad;
+	//mtd->block_markbad	= ath_spi_nand_block_markbad;
+
+	mtd->priv		= sc;
+
+
+	printk(	"====== NAND Parameters ======\n"
+		"sc = 0x%p page = 0x%x block = 0x%x", sc,
+		mtd->writesize, mtd->erasesize);
+
+	ath_spi_nand_scan(sc, mtd);
+
+	ath_spi_nand_test(sc, mtd);
+	return 0;
+
+out_err_hw_init:
+
+	return err;
+}
+
+int  ath_spi_nand_init(void)
+{
+	int ret;
+
+	printk(DRV_DESC ", Version " DRV_VERSION
+		" (c) 2014  Qualcomm Atheros Inc.\n");
+
+	ath_spi_fs(1);	// Enable access to SPI controller
+	ret = ath_spi_nand_probe();
+	ath_spi_fs(0);	// Disable access to SPI controller
+
+	return ret;
+}

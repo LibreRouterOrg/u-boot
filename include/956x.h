@@ -3375,7 +3375,7 @@
 #define ATH_PCI_CTLR_BASE       ATH_APB_BASE+0x00280000
 
 #define ATH_NAND_FLASH_BASE     0x1b800000u
-
+#define ATH_GPIO_OE             ATH_GPIO_BASE+0x0
 
 /*
  * DDR Config values

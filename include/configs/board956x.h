@@ -44,9 +44,14 @@
 #elif (FLASH_SIZE == 8)
 #define CFG_MAX_FLASH_SECT	128	/* max number of sectors on one chip */
 #define ATH_MTDPARTS_MIB0	"64k(mib0)"
-#else
+#elif (FLASH_SIZE == 4)
 #define CFG_MAX_FLASH_SECT	64	/* max number of sectors on one chip */
 #define ATH_MTDPARTS_MIB0	"64k(mib0)"
+#elif (FLASH_SIZE == 2)
+#define CFG_MAX_FLASH_SECT	32	/* max number of sectors on one chip */
+#define ATH_MTDPARTS_MIB0	"64k(mib0)"
+#else 
+#       error "Invalid flash Size/sector "
 #endif
 
 #define CFG_FLASH_SECTOR_SIZE	(64*1024)
@@ -54,8 +59,12 @@
 #define CFG_FLASH_SIZE		0x01000000	/* Total flash size */
 #elif (FLASH_SIZE == 8)
 #define CFG_FLASH_SIZE		0x00800000	/* max number of sectors on one chip */
-#else
+#elif (FLASH_SIZE == 4)
 #define CFG_FLASH_SIZE		0x00400000	/* Total flash size */
+#elif (FLASH_SIZE == 2) 
+#define CFG_FLASH_SIZE		0x00200000	/* Total flash size */
+#else 
+#       error "Invalid flash Size "
 #endif
 
 #ifndef COMPRESSED_UBOOT
@@ -157,18 +166,27 @@
 #		define ATH_ROOT_DEV	"31:03"
 #		define CFG_ENV_ADDR	0x00040000
 #	else //dual flash
-#		define ATH_U_CMD	gen_cmd(lu, 0x9f000000, ATH_U_FILE)
+#	ifdef ATH_SPI_NAND 
+#		define MTDPARTS_DEFAULT "mtdparts=ath-nor0:256k(u-boot),64k(u-boot-env),256k(POT),256k(trafficmeter),256k(config),896k(reserved),64k(ART);ath-spi-nand:2m(uImage),20m(rootfs),86m(storage),20m(reserved)"
+#		define ATH_ROOT_DEV	"31:08"
+#		define ATH_F_LEN	0x1400000
+#		define ATH_F_ADDR	0x200000
+#		define ATH_K_ADDR	0x0
+#		define ATH_K_LEN	0x200000
+#	else 
 #		define MTDPARTS_DEFAULT "mtdparts=ath-nor0:320k(u-boot-and-env);ath-nand:512k(pad),1280k(uImage),7m(rootfs),128k(dummy),128k(caldata)"
 #		define ATH_ROOT_DEV	"31:03"
-#		define CFG_ENV_ADDR	0x9f040000
+#		define ATH_F_LEN	0x700000
+#		define ATH_F_ADDR	0x1c0000
+#		define ATH_K_ADDR	0x80000
+#		define ATH_K_LEN	0x140000
 #	endif
+#	endif
+#	define CFG_ENV_ADDR	0x9f040000
 #	define ATH_F_FILE		fs_name(${bc}-nand-jffs2)
-#	define ATH_F_LEN		0x700000
-#	define ATH_F_ADDR		0x1c0000
 #	define ATH_K_FILE		vmlinux${bc}.lzma.uImage
-#	define ATH_K_ADDR		0x80000
 #	define ATH_F_CMD		nand_gen_cmd(lf, ATH_F_ADDR, ATH_F_FILE, ATH_F_LEN)
-#	define ATH_K_CMD		nand_gen_cmd(lk, ATH_K_ADDR, ATH_K_FILE, 0x140000)
+#	define ATH_K_CMD		nand_gen_cmd(lk, ATH_K_ADDR, ATH_K_FILE, ATH_K_LEN)
 #	define ATH_EXTRA_ENV		"bootdevice=0\0"
 #else
 #	if defined(COMPRESSED_UBOOT)
@@ -254,7 +272,11 @@
 #define CFG_INIT_SRAM_SP_OFFSET	0xbd001800
 
 #ifdef CONFIG_ATH_NAND_SUPPORT
+#ifdef ATH_SPI_NAND
+#	define CONFIG_BOOTCOMMAND       "nboot 0x81000000 0 0"
+#else
 #	define CONFIG_BOOTCOMMAND	"nboot 0x81000000 0 0x80000"
+#endif 
 #else
 #	define CFG_ENV_ADDR		0x9f040000
 #if (FLASH_SIZE ==16) /*FLASH_SIZE */
