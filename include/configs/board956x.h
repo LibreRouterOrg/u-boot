@@ -167,7 +167,7 @@
 #		define CFG_ENV_ADDR	0x00040000
 #	else //dual flash
 #	ifdef ATH_SPI_NAND 
-#		define MTDPARTS_DEFAULT "mtdparts=ath-nor0:256k(u-boot),64k(u-boot-env),256k(POT),256k(trafficmeter),256k(config),896k(reserved),64k(ART);ath-spi-nand:2m(uImage),20m(rootfs),86m(storage),20m(reserved)"
+#		define MTDPARTS_DEFAULT "mtdparts=ath-nor0:256k(u-boot),64k(u-boot-env),256k(POT),256k(trafficmeter),256k(config),896k(reserved),64k(caldata);ath-spi-nand:2m(uImage),20m(rootfs),86m(storage),20m(reserved)"
 #		define ATH_ROOT_DEV	"31:08"
 #		define ATH_F_LEN	0x1400000
 #		define ATH_F_ADDR	0x200000

@@ -50,6 +50,16 @@ do {								\
 	ath_spi_bit_banger(l, h, ((a & 0x0000ff) >> 0));	\
 } while (0)
 
+#define ath_spi_word_banger(_byte, _num, _cs)			\
+do {								\
+	unsigned int i;						\
+	ath_reg_wr_nf(ATH_SPI_SHIFT_DO, _byte);			\
+	ath_reg_wr_nf(ATH_SPI_SHIFT_CNT, (_num | _cs));		\
+	do {							\
+		i = ath_reg_rd(ATH_SPI_SHIFT_CNT);		\
+	} while (i & 0x80000000);				\
+} while (0)
+
 #define ath_spi_delay_8(l, h)	ath_spi_bit_banger(l, h, 0)
 #define ath_spi_done()		ath_reg_wr(ATH_SPI_FS, 0)
 
