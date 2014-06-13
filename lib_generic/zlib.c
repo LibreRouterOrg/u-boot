@@ -17,7 +17,6 @@
  * Copyright (C) 1995 Jean-loup Gailly.
  * For conditions of distribution and use, see copyright notice in zlib.h
  *
- * Copyright (c) 2013 Qualcomm Atheros, Inc.
  */
 
 /* WARNING: this file should *not* be used by applications. It is

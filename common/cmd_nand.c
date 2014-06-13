@@ -6,7 +6,6 @@
  *
  * Added 16-bit nand support
  * (C) 2004 Texas Instruments
- * Copyright (c) 2013 Qualcomm Atheros, Inc.
  */
 
 #include <common.h>

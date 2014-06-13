@@ -5,7 +5,6 @@
  *
  * Copyright (c) 1994 - 1997, 1999, 2000  Ralf Baechle (ralf@gnu.org)
  * Copyright (c) 2000  Silicon Graphics, Inc.
- * Copyright (c) 2013 Qualcomm Atheros, Inc.
  */
 #ifndef _ASM_BITOPS_H
 #define _ASM_BITOPS_H

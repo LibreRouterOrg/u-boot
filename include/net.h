@@ -4,8 +4,6 @@
  *	Copyright 1994 - 2000 Neil Russell.
  *	(See License)
  *
- *	Copyright (c) 2013 Qualcomm Atheros, Inc.
- *
  * History
  *	9/16/00	  bor  adapted to TQM823L/STK8xxL board, RARP/TFTP boot added
  */

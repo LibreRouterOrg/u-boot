@@ -1,8 +1,6 @@
 /*
- * $Id: //depot/sw/qca_main/components/bootloaders/u-boot-1.1.4/1.1/include/linux/mtd/mtd.h#3 $
  *
  * Copyright (C) 1999-2003 David Woodhouse <dwmw2@infradead.org> et al.
- * Copyright (c) 2013 Qualcomm Atheros, Inc.
  *
  * Released under GPL
  */

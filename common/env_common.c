@@ -1,6 +1,4 @@
 /*
- * Copyright (c) 2013 Qualcomm Atheros, Inc.
- *
  * (C) Copyright 2000-2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *

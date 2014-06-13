@@ -2,9 +2,6 @@
  *  drivers/mtd/nandids.c
  *
  *  Copyright (C) 2002 Thomas Gleixner (tglx@linutronix.de)
- *  Copyright (c) 2013 Qualcomm Atheros, Inc.
- *
- * $Id: //depot/sw/qca_main/components/bootloaders/u-boot-1.1.4/1.1/drivers/nand/nand_ids.c#3 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as

@@ -3,8 +3,6 @@
  * 2N Telekomunikace, a.s. <www.2n.cz>
  * Ladislav Michl <michl@2n.cz>
  *
- * Copyright (c) 2013 Qualcomm Atheros, Inc.
- *
  * See file CREDITS for list of people who contributed to this
  * project.
  *

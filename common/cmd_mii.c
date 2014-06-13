@@ -2,8 +2,6 @@
  * (C) Copyright 2001
  * Gerald Van Baren, Custom IDEAS, vanbaren@cideas.com
  *
- * Copyright (c) 2013 Qualcomm Atheros, Inc.
- *
  * See file CREDITS for list of people who contributed to this
  * project.
  *
