@@ -4,8 +4,6 @@
  * Wolfgang Denk, wd@denx.de
  * All rights reserved.
  *
- * Copyright (c) 2013 Qualcomm Atheros, Inc.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of
