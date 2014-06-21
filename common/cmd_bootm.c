@@ -31,6 +31,7 @@
 #include <malloc.h>
 #include <zlib.h>
 #include <bzlib.h>
+#include <LzmaWrapper.h>
 #include <environment.h>
 #include <asm/byteorder.h>
 
@@ -339,6 +340,7 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 #endif	/* CONFIG_HW_WATCHDOG || CONFIG_WATCHDOG */
 		}
 		break;
+#ifndef CONFIG_NO_GZIP
 	case IH_COMP_GZIP:
 		printf ("   Uncompressing %s ... ", name);
 		if (gunzip ((void *)ntohl(hdr->ih_load), unc_len,
@@ -348,6 +350,7 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 			do_reset (cmdtp, flag, argc, argv);
 		}
 		break;
+#endif
 #ifdef CONFIG_BZIP2
 	case IH_COMP_BZIP2:
 		printf ("   Uncompressing %s ... ", name);
@@ -367,6 +370,21 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 		}
 		break;
 #endif /* CONFIG_BZIP2 */
+#ifdef CONFIG_LZMA
+	case IH_COMP_LZMA:
+		printf ("   Uncompressing %s ... ", type_name);
+		int i = lzma_inflate ((unsigned char *)os_data, os_len,
+					(unsigned char *)load_start, &unc_len);
+		if (i != LZMA_RESULT_OK) {
+			printf ("LZMA: uncompress or overwrite error %d "
+				"- must RESET board to recover\n", i);
+			show_boot_progress (-6);
+			do_reset (cmdtp, flag, argc, argv);
+		}
+
+		load_end = load_start + unc_len;
+		break;
+#endif /* CONFIG_LZMA */
 	default:
 		if (iflag)
 			enable_interrupts();
