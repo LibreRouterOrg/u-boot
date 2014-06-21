@@ -2,6 +2,8 @@
  * (C) Copyright 2000-2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
+ * 
  * See file CREDITS for list of people who contributed to this
  * project.
  *
@@ -78,6 +80,7 @@ U_BOOT_CMD(
 
 #endif	/*  CFG_CMD_ECHO */
 
+#ifndef COMPRESSED_UBOOT
 #ifdef CFG_HUSH_PARSER
 
 int
@@ -230,6 +233,7 @@ U_BOOT_CMD(
 
 
 #endif
+#endif /* #ifdef COMPRESSED_UBOOT */
 
 /*
  * Use puts() instead of printf() to avoid printf buffer overflow

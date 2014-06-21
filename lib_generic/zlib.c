@@ -16,6 +16,8 @@
 /* zutil.h -- internal interface and configuration of the compression library
  * Copyright (C) 1995 Jean-loup Gailly.
  * For conditions of distribution and use, see copyright notice in zlib.h
+ *
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
  */
 
 /* WARNING: this file should *not* be used by applications. It is
@@ -2101,7 +2103,9 @@ z_stream *z;
 
 /* From: zutil.c,v 1.8 1995/05/03 17:27:12 jloup Exp */
 
+#ifndef COMPRESSED_UBOOT
 char *zlib_version = ZLIB_VERSION;
+#endif
 
 char *z_errmsg[] = {
 "stream end",          /* Z_STREAM_END    1 */

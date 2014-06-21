@@ -2,6 +2,8 @@
  * (C) Copyright 2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
+ *
  * See file CREDITS for list of people who contributed to this
  * project.
  *
@@ -28,6 +30,9 @@
 #include <asm/byteorder.h>
 #include <asm/addrspace.h>
 
+#ifdef CONFIG_AR7240
+#include <ar7240_soc.h>
+#endif
 DECLARE_GLOBAL_DATA_PTR;
 
 #define	LINUX_MAX_ENVS		256
@@ -54,6 +59,18 @@ static int	linux_env_idx;
 static void linux_params_init (ulong start, char * commandline);
 static void linux_env_set (char * env_name, char * env_val);
 
+#ifdef CONFIG_WASP_SUPPORT
+void wasp_set_cca(void)
+{
+	/* set cache coherency attribute */
+	asm(	"mfc0	$t0,	$16\n"		/* CP0_CONFIG == 16 */
+		"li	$t1,	~7\n"
+		"and	$t0,	$t0,	$t1\n"
+		"ori	$t0,	3\n"		/* CONF_CM_CACHABLE_NONCOHERENT */
+		"mtc0	$t0,	$16\n"		/* CP0_CONFIG == 16 */
+		"nop\n": : );
+}
+#endif
 
 void do_bootm_linux (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[],
 		     ulong addr, ulong * len_ptr, int verify)
@@ -61,13 +78,24 @@ void do_bootm_linux (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[],
 	ulong len = 0, checksum;
 	ulong initrd_start, initrd_end;
 	ulong data;
+#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
+	int flash_size_mbytes;
+	void (*theKernel) (int, char **, char **, int);
+#else
 	void (*theKernel) (int, char **, char **, int *);
+#endif
 	image_header_t *hdr = &header;
 	char *commandline = getenv ("bootargs");
 	char env_buf[12];
 
+
+#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
+	theKernel =
+		(void (*)(int, char **, char **, int)) ntohl (hdr->ih_ep);
+#else
 	theKernel =
 		(void (*)(int, char **, char **, int *)) ntohl (hdr->ih_ep);
+#endif
 
 	/*
 	 * Check if there is an initrd image
@@ -213,12 +241,22 @@ void do_bootm_linux (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[],
 	/* we assume that the kernel is in place */
 	printf ("\nStarting kernel ...\n\n");
 
+#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
+#ifdef CONFIG_WASP_SUPPORT
+	wasp_set_cca();
+#endif
+	/* Pass the flash size as expected by current Linux kernel for AR7100 */
+	flash_size_mbytes = gd->bd->bi_flashsize/(1024 * 1024);
+	theKernel (linux_argc, linux_argv, linux_env, flash_size_mbytes);
+#else
 	theKernel (linux_argc, linux_argv, linux_env, 0);
+#endif
 }
 
 static void linux_params_init (ulong start, char *line)
 {
 	char *next, *quote, *argp;
+	char memstr[32];
 
 	linux_argc = 1;
 	linux_argv = (char **) start;
@@ -226,6 +264,12 @@ static void linux_params_init (ulong start, char *line)
 	argp = (char *) (linux_argv + LINUX_MAX_ARGS);
 
 	next = line;
+
+	if (strstr(line, "mem=")) {
+		memstr[0] = 0;
+	} else {
+		memstr[0] = 1;
+	}
 
 	while (line && *line && linux_argc < LINUX_MAX_ARGS) {
 		quote = strchr (line, '"');
@@ -249,6 +293,18 @@ static void linux_params_init (ulong start, char *line)
 		linux_argv[linux_argc] = argp;
 		memcpy (argp, line, next - line);
 		argp[next - line] = 0;
+#if defined(CONFIG_AR7240)
+#define REVSTR	"REVISIONID"
+#define PYTHON	"python"
+#define VIRIAN	"virian"
+		if (strcmp(argp, REVSTR) == 0) {
+			if (is_ar7241() || is_ar7242()) {
+				strcpy(argp, VIRIAN);
+			} else {
+				strcpy(argp, PYTHON);
+			}
+		}
+#endif
 
 		argp += next - line + 1;
 		linux_argc++;
@@ -258,6 +314,17 @@ static void linux_params_init (ulong start, char *line)
 
 		line = next;
 	}
+
+#if defined(CONFIG_AR9100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
+	/* Add mem size to command line */
+	if (memstr[0]) {
+		sprintf(memstr, "mem=%luM", gd->ram_size >> 20);
+		memcpy (argp, memstr, strlen(memstr)+1);
+		linux_argv[linux_argc] = argp;
+		linux_argc++;
+		argp += strlen(memstr) + 1;
+	}
+#endif
 
 	linux_env = (char **) (((ulong) argp + 15) & ~15);
 	linux_env[0] = 0;

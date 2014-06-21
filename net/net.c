@@ -6,6 +6,7 @@
  *	Copyright 2000 Roland Borde
  *	Copyright 2000 Paolo Scaffardi
  *	Copyright 2000-2002 Wolfgang Denk, wd@denx.de
+ *	Copyright (c) 2013 Qualcomm Atheros, Inc.
  */
 
 /*
@@ -155,6 +156,9 @@ IPaddr_t	NetPingIP;		/* the ip address to ping 		*/
 
 static void PingStart(void);
 #endif
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+extern void athr_hdr_func(void);
+#endif
 
 #if (CONFIG_COMMANDS & CFG_CMD_CDP)
 static void CDPStart(void);
@@ -269,6 +273,9 @@ int
 NetLoop(proto_t protocol)
 {
 	bd_t *bd = gd->bd;
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+	static int AthrHdr_Flag = 0;
+#endif
 
 #ifdef CONFIG_NET_MULTI
 	NetRestarted = 0;
@@ -300,15 +307,36 @@ NetLoop(proto_t protocol)
 		NetArpWaitTxPacket -= (ulong)NetArpWaitTxPacket % PKTALIGN;
 		NetArpWaitTxPacketSize = 0;
 	}
-
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+	if(!AthrHdr_Flag) {
+	        eth_halt();
+		if (eth_init(bd) < 0) {
+            	    eth_halt();
+               	 return(-1);
+        	}
+		AthrHdr_Flag = 1;
+	}
+#else
 	eth_halt();
 #ifdef CONFIG_NET_MULTI
+#if defined(CFG_VITESSE_73XX_NOPHY) || defined(CFG_REH132)
+	/*
+	 * There is no PHY in the DNI AP83 board with vitesse switch
+	 * VSC7395XYV, so set the eth1 interface to switch ports, so
+	 * that u-boot can route all the traffic through the switch
+	 * ports.
+	 */
+	setenv("ethact", "eth1");
+#else
+        setenv("ethact", "eth0");
+#endif
 	eth_set_current();
 #endif
 	if (eth_init(bd) < 0) {
 		eth_halt();
 		return(-1);
 	}
+#endif
 
 restart:
 #ifdef CONFIG_NET_MULTI
@@ -380,9 +408,18 @@ restart:
 		NetOurVLAN = getenv_VLAN("vlan");	/* VLANs must be read */
 		NetOurNativeVLAN = getenv_VLAN("nvlan");
 		break;
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+	case ATHRHDR:
+		athr_hdr_func();
+		break;
+#endif
 	default:
 		break;
 	}
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+	if(protocol == ATHRHDR)
+		goto skip_netloop;
+#endif
 
 	switch (net_check_prereq (protocol)) {
 	case 1:
@@ -415,7 +452,7 @@ restart:
 			DhcpRequest();		/* Basically same as BOOTP */
 			break;
 #endif /* CFG_CMD_DHCP */
-
+#ifndef COMPRESSED_UBOOT
 		case BOOTP:
 			BootpTry = 0;
 			BootpRequest ();
@@ -425,11 +462,13 @@ restart:
 			RarpTry = 0;
 			RarpRequest ();
 			break;
+#endif
 #if (CONFIG_COMMANDS & CFG_CMD_PING)
 		case PING:
 			PingStart();
 			break;
 #endif
+
 #if (CONFIG_COMMANDS & CFG_CMD_NFS)
 		case NFS:
 			NfsStart();
@@ -475,6 +514,7 @@ restart:
 	 *	Main packet reception loop.  Loop receiving packets until
 	 *	someone sets `NetState' to a state that terminates.
 	 */
+skip_netloop:
 	for (;;) {
 		WATCHDOG_RESET();
 #ifdef CONFIG_SHOW_ACTIVITY
@@ -497,8 +537,12 @@ restart:
 			puts ("\nAbort\n");
 			return (-1);
 		}
-
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+                if(protocol != ATHRHDR)
+			ArpTimeoutCheck();
+#else
 		ArpTimeoutCheck();
+#endif
 
 		/*
 		 *	Check for a timeout, and run the timeout handler
@@ -506,7 +550,7 @@ restart:
 		 */
 		if (timeHandler && ((get_timer(0) - timeStart) > timeDelta)) {
 			thand_f *x;
-
+#if !defined(CFG_ATHRS26_PHY) && !defined(CFG_ATHRHDR_EN)
 #if defined(CONFIG_MII) || (CONFIG_COMMANDS & CFG_CMD_MII)
 #  if defined(CFG_FAULT_ECHO_LINK_DOWN) && \
       defined(CONFIG_STATUS_LED) &&	   \
@@ -521,12 +565,11 @@ restart:
 			}
 #  endif /* CFG_FAULT_ECHO_LINK_DOWN, ... */
 #endif /* CONFIG_MII, ... */
+#endif
 			x = timeHandler;
 			timeHandler = (thand_f *)0;
 			(*x)();
 		}
-
-
 		switch (NetState) {
 
 		case NETLOOP_RESTART:
@@ -536,11 +579,17 @@ restart:
 			goto restart;
 
 		case NETLOOP_SUCCESS:
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+			if(protocol == ATHRHDR)
+				return 1;
+#endif
+
 			if (NetBootFileXferSize > 0) {
 				char buf[10];
 				printf("Bytes transferred = %ld (%lx hex)\n",
 					NetBootFileXferSize,
 					NetBootFileXferSize);
+
 				sprintf(buf, "%lx", NetBootFileXferSize);
 				setenv("filesize", buf);
 
@@ -1140,6 +1189,9 @@ NetReceive(volatile uchar * inpkt, int len)
 	IPaddr_t tmp;
 	int	x;
 	uchar *pkt;
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+        uint8_t type;
+#endif
 #if (CONFIG_COMMANDS & CFG_CMD_CDP)
 	int iscdp;
 #endif
@@ -1149,9 +1201,26 @@ NetReceive(volatile uchar * inpkt, int len)
 	printf("packet received\n");
 #endif
 
-	NetRxPkt = inpkt;
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+	type = (inpkt[1] & 0xf);
+	/* check for ack */
+       if(type == 0x6){
+               (*packetHandler)(inpkt,0,0,0);
+		return;
+	}
+	else if (type == 0x0) {
+	   inpkt = inpkt + ATHRHDR_LEN;  /* Remove ATHRHDR */
+	   len = len - ATHRHDR_LEN;
+	}
+	else{
+		printf("Packet dropped! Type invalid.\n");
+		return;
+	}
+#endif
+
+        NetRxPkt = inpkt;
 	NetRxPktLen = len;
-	et = (Ethernet_t *)inpkt;
+        et = (Ethernet_t *)inpkt;
 
 	/* too small packet? */
 	if (len < ETHER_HDR_SIZE)

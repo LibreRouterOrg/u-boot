@@ -1,10 +1,12 @@
 /*
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
+ *
  * (C) Copyright 2000-2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
  * (C) Copyright 2001 Sysgo Real-Time Solutions, GmbH <www.elinos.com>
  * Andreas Heppel <aheppel@sysgo.de>
-
+ *
  * See file CREDITS for list of people who contributed to this
  * project.
  *
@@ -207,7 +209,7 @@ void env_relocate (void)
 	enable_nvram();
 #endif
 
-#ifdef ENV_IS_EMBEDDED
+#if defined(ENV_IS_EMBEDDED)
 	/*
 	 * The environment buffer is embedded with the text segment,
 	 * just relocate the environment pointer

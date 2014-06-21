@@ -2,6 +2,8 @@
 # (C) Copyright 2000-2002
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 #
+# Copyright (c) 2013 Qualcomm Atheros, Inc.
+#
 # See file CREDITS for list of people who contributed to this
 # project.
 #
@@ -25,10 +27,18 @@ include $(TOPDIR)/config.mk
 
 LIB	= libgeneric.a
 
+ifeq ($(COMPRESSED_UBOOT),1)
+OBJS    = crc32.o ctype.o display_options.o ldiv.o \
+			string.o vsprintf.o LzmaWrapper.o LzmaDecode.o
+else
 OBJS	= bzlib.o bzlib_crctable.o bzlib_decompress.o \
 	  bzlib_randtable.o bzlib_huffman.o \
 	  crc32.o ctype.o display_options.o ldiv.o \
-	  string.o vsprintf.o zlib.o
+	  string.o vsprintf.o zlib.o LzmaDecode.o LzmaWrapper.o
+endif
+
+CFLAGS += -DCONFIG_LZMA=1
+
 
 $(LIB):	.depend $(OBJS)
 	$(AR) crv $@ $(OBJS)

@@ -5,6 +5,7 @@
  *
  * Copyright (C) 1996 by Ralf Baechle
  * Copyright (C) 2000 by Maciej W. Rozycki
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
  *
  * Defitions for the address spaces of the MIPS CPUs.
  */
@@ -48,7 +49,9 @@
 /* We use a 36 bit physical address map here and
    cannot access physical memory directly from core */
 #define UNCACHED_SDRAM(a) (((unsigned long)(a)) | 0x20000000)
-#else	/* !CONFIG_AU1X00 */
+#elif defined(CONFIG_AR7100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
+#define UNCACHED_SDRAM(a)   KSEG1ADDR((a))
+#else	/* !CONFIG_AR7100 */
 #define UNCACHED_SDRAM(a) PHYSADDR(a)
 #endif	/* CONFIG_AU1X00 */
 #endif	/* __ASSEMBLY__ */

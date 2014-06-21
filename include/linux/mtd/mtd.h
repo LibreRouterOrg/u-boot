@@ -1,7 +1,8 @@
 /*
- * $Id: mtd.h,v 1.56 2004/08/09 18:46:04 dmarlin Exp $
+ * $Id: //depot/sw/qca_main/components/bootloaders/u-boot-1.1.4/1.1/include/linux/mtd/mtd.h#3 $
  *
  * Copyright (C) 1999-2003 David Woodhouse <dwmw2@infradead.org> et al.
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
  *
  * Released under GPL
  */
@@ -60,6 +61,10 @@ struct mtd_info {
 	u_int32_t ecctype;
 	u_int32_t eccsize;
 
+	u_int32_t erasesize_shift;
+	u_int32_t erasesize_mask;
+	u_int32_t writesize_shift;
+	u_int32_t writesize_mask;
 
 	/* Kernel-only stuff starts here. */
 	char *name;

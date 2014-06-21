@@ -2,6 +2,8 @@
  * (C) Copyright 2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
+ *
  * See file CREDITS for list of people who contributed to this
  * project.
  *
@@ -44,6 +46,13 @@ DECLARE_GLOBAL_DATA_PTR;
 extern int timer_init(void);
 
 extern int incaip_set_cpuclk(void);
+
+#if defined(CONFIG_WASP_SUPPORT) || defined(CONFIG_MACH_QCA955x) || defined(CONFIG_MACH_QCA953x) || defined(CONFIG_MACH_QCA956x)
+void ath_set_tuning_caps(void);
+#else
+#define ath_set_tuning_caps()	/* nothing */
+#endif
+
 
 extern ulong uboot_end_data;
 extern ulong uboot_end;
@@ -113,6 +122,7 @@ static int display_banner(void)
 {
 
 	printf ("\n\n%s\n\n", version_string);
+
 	return (0);
 }
 
@@ -159,17 +169,23 @@ static int init_baudrate (void)
 typedef int (init_fnc_t) (void);
 
 init_fnc_t *init_sequence[] = {
+#ifndef COMPRESSED_UBOOT
 	timer_init,
+#endif
 	env_init,		/* initialize environment */
 #ifdef CONFIG_INCA_IP
 	incaip_set_cpuclk,	/* set cpu clock according to environment variable */
 #endif
 	init_baudrate,		/* initialze baudrate settings */
+#ifndef COMPRESSED_UBOOT
 	serial_init,		/* serial communications setup */
+#endif
 	console_init_f,
 	display_banner,		/* say that we are here */
+#ifndef COMPRESSED_UBOOT
 	checkboard,
-	init_func_ram,
+        init_func_ram,
+#endif
 	NULL,
 };
 
@@ -181,9 +197,13 @@ void board_init_f(ulong bootflag)
 	init_fnc_t **init_fnc_ptr;
 	ulong addr, addr_sp, len = (ulong)&uboot_end - CFG_MONITOR_BASE;
 	ulong *s;
+#ifdef COMPRESSED_UBOOT
+        char board_string[50];
+#endif
 #ifdef CONFIG_PURPLE
 	void copy_code (ulong);
 #endif
+
 
 	/* Pointer is writable since we allocated a register for it.
 	 */
@@ -198,6 +218,14 @@ void board_init_f(ulong bootflag)
 			hang ();
 		}
 	}
+
+#ifdef COMPRESSED_UBOOT
+        checkboard(board_string);
+        printf("%s\n\n",board_string);
+        gd->ram_size = bootflag;
+	puts ("DRAM:  ");
+	print_size (gd->ram_size, "\n");
+#endif
 
 	/*
 	 * Now that we have DRAM mapped and working, we can
@@ -301,6 +329,9 @@ void board_init_r (gd_t *id, ulong dest_addr)
 #ifndef CFG_ENV_IS_NOWHERE
 	extern char * env_name_spec;
 #endif
+#ifdef CONFIG_ATH_NAND_SUPPORT
+	extern ulong ath_nand_init(void);
+#endif
 	char *s, *e;
 	bd_t *bd;
 	int i;
@@ -347,9 +378,11 @@ void board_init_r (gd_t *id, ulong dest_addr)
 	env_name_spec += gd->reloc_off;
 #endif
 
+#ifndef CONFIG_ATH_NAND_BR
 	/* configure available FLASH banks */
 	size = flash_init();
 	display_flash_config (size);
+#endif
 
 	bd = gd->bd;
 	bd->bi_flashstart = CFG_FLASH_BASE;
@@ -363,6 +396,10 @@ void board_init_r (gd_t *id, ulong dest_addr)
 	/* initialize malloc() area */
 	mem_malloc_init();
 	malloc_bin_reloc();
+
+#ifdef CONFIG_ATH_NAND_BR
+	ath_nand_init();
+#endif
 
 	/* relocate environment function pointers etc. */
 	env_relocate();
@@ -416,6 +453,12 @@ void board_init_r (gd_t *id, ulong dest_addr)
 #endif
 	eth_initialize(gd->bd);
 #endif
+
+#if defined(CONFIG_ATH_NAND_SUPPORT) && !defined(CONFIG_ATH_NAND_BR)
+	ath_nand_init();
+#endif
+
+        ath_set_tuning_caps(); /* Needed here not to mess with Ethernet clocks */
 
 	/* main_loop() can return to retry autoboot, if so just run it again. */
 	for (;;) {

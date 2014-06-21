@@ -2,6 +2,8 @@
 # (C) Copyright 2000
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 #
+# Copyright (c) 2013 Qualcomm Atheros, Inc.
+#
 # See file CREDITS for list of people who contributed to this
 # project.
 #
@@ -26,8 +28,12 @@ include $(TOPDIR)/config.mk
 # CFLAGS += -DET_DEBUG -DDEBUG
 
 LIB	= libnet.a
-
+ifeq ($(COMPRESSED_UBOOT),1)
+OBJS	= net.o tftp.o rarp.o eth.o
+else
 OBJS	= net.o tftp.o bootp.o rarp.o eth.o nfs.o sntp.o
+endif
+
 all:	$(LIB)
 
 $(LIB):	$(START) $(OBJS)

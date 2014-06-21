@@ -2,6 +2,8 @@
 # (C) Copyright 2000-2004
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 #
+# Copyright (c) 2013 Qualcomm Atheros, Inc.
+#
 # See file CREDITS for list of people who contributed to this
 # project.
 #
@@ -27,7 +29,7 @@ include $(TOPDIR)/config.mk
 
 LIB	= libdrivers.a
 
-OBJS	= 3c589.o 5701rls.o ali512x.o \
+#OBJS	= 3c589.o 5701rls.o ali512x.o \
 	  bcm570x.o bcm570x_autoneg.o cfb_console.o cfi_flash.o \
 	  cs8900.o ct69000.o dataflash.o dc2114x.o dm9000x.o \
 	  e1000.o eepro100.o \
@@ -49,6 +51,8 @@ OBJS	= 3c589.o 5701rls.o ali512x.o \
 	  usbdcore.o usbdcore_ep0.o usbdcore_omap1510.o usbtty.o \
 	  videomodes.o w83c553f.o \
 	  ks8695eth.o
+
+OBJS	=	pci.o
 
 all:	$(LIB)
 

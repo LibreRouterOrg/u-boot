@@ -3,6 +3,8 @@
  *
  *  Copyright (c) 2003	Wolfgang Denk <wd@denx.de>
  *
+ *  Copyright (c) 2013 Qualcomm Atheros, Inc.
+ *
  * See file CREDITS for list of people who contributed to this
  * project.
  *
@@ -31,10 +33,10 @@
 #include <asm/cacheops.h>
 
 
-	/* 16KB is the maximum size of instruction and data caches on
-	 * MIPS 4K.
+	/* 64K is the maximum size of instruction and data caches on
+	 * MIPS 24K.
 	 */
-#define MIPS_MAX_CACHE_SIZE	0x4000
+#define MIPS_MAX_CACHE_SIZE	65536
 
 
 /*
@@ -106,6 +108,41 @@
 #define icacheop(kva, n, cacheSize, cacheLineSize, op) \
    icacheopn(kva, n, cacheSize, cacheLineSize, 1, (op))
 
+
+.globl simple_mips_cache_reset
+.ent   simple_mips_cache_reset
+
+simple_mips_cache_reset:
+        li      t2, CFG_ICACHE_SIZE
+        li      t3, CFG_DCACHE_SIZE
+        li      t4, CFG_CACHELINE_SIZE
+
+        mtc0    zero, CP0_TAGLO
+#if defined(CONFIG_WASP_SUPPORT) || defined(CONFIG_MACH_QCA956x)
+	mtc0	zero, $29	# C0_TagHi
+	mtc0	zero, $28, 2	# C0_DTagLo
+	mtc0	zero, $29, 2	# C0_DTagHi
+#endif
+
+        li      t0, K0BASE
+    	add     t2, t2, t0
+
+_arai_icache_loop:
+    	cache   Index_Store_Tag_I, 0(t0)
+    	add     t0, t0, t4
+    	bne     t0, t2, _arai_icache_loop
+
+        li      t0, K0BASE
+    	add     t3, t3, t0
+_arai_dcache_loop:
+    	cache   Index_Store_Tag_D, 0(t0)
+    	add     t0, t0, t4
+    	bne     t0, t3, _arai_dcache_loop
+	
+	j  ra
+	.end  simple_mips_cache_reset
+	
+
 /*******************************************************************************
 *
 * mips_cache_reset - low level initialisation of the primary caches
@@ -154,7 +191,14 @@ mips_cache_reset:
 	/* Set invalid tag.
 	 */
 
+
 	mtc0	zero, CP0_TAGLO
+#if defined(CONFIG_WASP_SUPPORT) || defined(CONFIG_MACH_QCA956x)
+	mtc0	zero, $29	# C0_TagHi
+	mtc0	zero, $28, 2	# C0_DTagLo
+	mtc0	zero, $29, 2	# C0_DTagHi
+#endif
+
 
    /*
     * The caches are probably in an indeterminate state,
@@ -183,6 +227,7 @@ mips_cache_reset:
 	move	a1, a2
 	icacheop(a0,a1,a2,a3,Index_Store_Tag_D)
 
+
 	/* 2: fill dcache.
 	 */
 
@@ -192,6 +237,7 @@ mips_cache_reset:
 	move	a1, a2
 	icacheopn(a0,a1,a2,a3,1lw,(dummy))
 
+
 	/* 3: clear dcache tags.
 	 */
 
@@ -200,6 +246,7 @@ mips_cache_reset:
 	move	a3, t5		# dcacheLineSize
 	move	a1, a2
 	icacheop(a0,a1,a2,a3,Index_Store_Tag_D)
+
 
 	j  ra
 	.end  mips_cache_reset
@@ -267,3 +314,130 @@ mips_cache_lock:
 
 	j	ra
 	.end	mips_cache_lock
+
+/*****************************************************************************
+ * flushes a range in dcache
+ * a0 = start
+ * a1 = end
+ */
+    .globl  dcache_flush_range
+    .ent    dcache_flush_range
+dcache_flush_range:
+    move    t0, a0
+    li      t1, CFG_CACHELINE_SIZE
+    move    t2, a1
+cache_loop_d_flush_range:
+    cache   Hit_Writeback_Inv_D, 0(t0)
+    addu    t0, t1
+    bne     t0, t2, cache_loop_d_flush_range
+    nop
+	j  ra
+    .end    dcache_flush_range
+
+/****************************************************************************
+ *
+ * mips_cache_flush_all - flushes entire I and D caches.
+ */
+
+    .globl  mips_cache_flush
+    .ent    mips_cache_flush
+mips_cache_flush:
+	/* Flush caches...
+	 */
+    li      t0, (CFG_ICACHE_SIZE)
+    li      t1, CFG_CACHELINE_SIZE
+    li      t2, KSEG0
+    addu    t3, t0, t2
+    mtc0    zero, CP0_TAGLO
+#if defined(CONFIG_WASP_SUPPORT) || defined(CONFIG_MACH_QCA956x)
+	mtc0	zero, $29	# C0_TagHi
+	mtc0	zero, $28, 2	# C0_DTagLo
+	mtc0	zero, $29, 2	# C0_DTagHi
+#endif
+cache_loop_flush:
+    cache   Hit_Invalidate_I, 0(t2)
+    addu    t2, t1
+    bne     t2, t3, cache_loop_flush
+    nop
+
+    li      t0, (CFG_DCACHE_SIZE)
+    li      t1, CFG_CACHELINE_SIZE
+    li      t2, KSEG0
+    addu    t3, t0, t2
+cache_loop_d_flush:
+    cache   Hit_Writeback_Inv_D, 0(t2)
+    addu    t2, t1
+    bne     t2, t3, cache_loop_d_flush
+    nop
+	j  ra
+	.end  mips_cache_flush
+
+/*
+ * Invalidate the I-Cache.
+ * Note:If this is executed from cached address space,
+ *      the cache would still have the addresses of this
+ *      function.
+ */
+	.globl	mips_icache_flush_ix
+	.ent	mips_icache_flush_ix
+
+mips_icache_flush_ix:	/* Flush caches Index Invalidate */
+	li	t0,	(CFG_ICACHE_SIZE)
+	li	t1,	CFG_CACHELINE_SIZE
+	li	t2,	KUSEG
+	addu	t3,	t0,	t2
+	mtc0	zero,	CP0_TAGLO
+#if defined(CONFIG_WASP_SUPPORT) || defined(CONFIG_MACH_QCA956x)
+	mtc0	zero, $29	# C0_TagHi
+	mtc0	zero, $28, 2	# C0_DTagLo
+	mtc0	zero, $29, 2	# C0_DTagHi
+#endif
+icache_loop_flush_ix:
+	cache	Index_Invalidate_I,	0(t2)
+	addu	t2,	t1
+	bne	t2,	t3,	icache_loop_flush_ix
+	nop
+
+	j	ra
+	.end	mips_icache_flush_ix
+
+
+
+/*********************************************************
+ * mips_cache_lock_24k
+ */
+
+    .globl  mips_cache_lock_24k
+    .ent    mips_cache_lock_24k
+
+mips_cache_lock_24k:
+    li      t0, 7936 
+    li      t1, CFG_CACHELINE_SIZE
+    li      t2, KSEG0
+    addu    t3, t0, t2
+    mtc0    zero, CP0_TAGLO
+#if defined(CONFIG_WASP_SUPPORT) || defined(CONFIG_MACH_QCA956x)
+	mtc0	zero, $29	# C0_TagHi
+	mtc0	zero, $28, 2	# C0_DTagLo
+	mtc0	zero, $29, 2	# C0_DTagHi
+#endif
+cache_loop_lock:
+
+    li      t5, 0xfffff000
+    and     t4, t2, t5
+    ori     t4, t4, (1 << 7)
+    mtc0    t4, CP0_TAGLO
+#if defined(CONFIG_WASP_SUPPORT) || defined(CONFIG_MACH_QCA956x)
+	mtc0	zero, $29	# C0_TagHi
+	mtc0	zero, $28, 2	# C0_DTagLo
+	mtc0	zero, $29, 2	# C0_DTagHi
+#endif
+
+    cache   Index_Load_Tag_D, 0(t2)
+    cache   0x1d, 0(t2)
+    addu    t2, t1
+    bne     t2, t3, cache_loop_lock
+    nop
+	j  ra
+    .end    mips_cache_lock_24k
+

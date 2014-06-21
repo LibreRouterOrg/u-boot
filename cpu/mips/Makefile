@@ -2,6 +2,8 @@
 # (C) Copyright 2003
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 #
+# Copyright (c) 2013 Qualcomm Atheros, Inc.
+#
 # See file CREDITS for list of people who contributed to this
 # project.
 #
@@ -25,10 +27,14 @@ include $(TOPDIR)/config.mk
 
 LIB	= lib$(CPU).a
 
+ifeq ($(COMRESSED_UBOOT),1)
+START	= start.o start_bootstrap.o
+else
 START	= start.o
-OBJS	= asc_serial.o au1x00_serial.o au1x00_eth.o au1x00_usb_ohci.o \
-	  cpu.o interrupts.o incaip_clock.o
-SOBJS	= incaip_wdt.o cache.o
+endif
+
+OBJS	= cpu.o interrupts.o
+SOBJS	= cache.o
 
 all:	.depend $(START) $(LIB)
 

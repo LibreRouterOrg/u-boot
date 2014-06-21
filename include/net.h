@@ -4,6 +4,7 @@
  *	Copyright 1994 - 2000 Neil Russell.
  *	(See License)
  *
+ *	Copyright (c) 2013 Qualcomm Atheros, Inc.
  *
  * History
  *	9/16/00	  bor  adapted to TQM823L/STK8xxL board, RARP/TFTP boot added
@@ -268,7 +269,11 @@ typedef struct icmphdr {
  * maximum packet size =  1518
  * maximum packet size and multiple of 32 bytes =  1536
  */
+#ifdef CFG_ATHRHDR_EN
+#define PKTSIZE			1520
+#else
 #define PKTSIZE			1518
+#endif
 #define PKTSIZE_ALIGN		1536
 /*#define PKTSIZE		608*/
 
@@ -336,7 +341,11 @@ extern int		NetState;		/* Network loop state		*/
 extern int		NetRestartWrap;		/* Tried all network devices	*/
 #endif
 
+#if defined(CFG_ATHRS26_PHY) && defined(CFG_ATHRHDR_EN)
+typedef enum { BOOTP, RARP, ARP, TFTP, DHCP, PING, DNS, NFS, CDP, NETCONS, SNTP, ATHRHDR } proto_t;
+#else
 typedef enum { BOOTP, RARP, ARP, TFTP, DHCP, PING, DNS, NFS, CDP, NETCONS, SNTP } proto_t;
+#endif
 
 /* from net/net.c */
 extern char	BootFile[128];			/* Boot File name		*/

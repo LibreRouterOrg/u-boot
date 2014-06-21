@@ -19,8 +19,6 @@
   to this file, however, are subject to the LGPL or CPL terms.
 */
 
-#include <config.h>
-
 #ifdef CONFIG_LZMA
 
 #include "LzmaDecode.h"

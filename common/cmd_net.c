@@ -2,6 +2,8 @@
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
+ *
  * See file CREDITS for list of people who contributed to this
  * project.
  *
@@ -34,7 +36,7 @@
 extern int do_bootm (cmd_tbl_t *, int, int, char *[]);
 
 static int netboot_common (proto_t, cmd_tbl_t *, int , char *[]);
-
+#ifndef COMPRESSED_UBOOT
 int do_bootp (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 {
 	return netboot_common (BOOTP, cmdtp, argc, argv);
@@ -46,17 +48,6 @@ U_BOOT_CMD(
 	"[loadAddress] [bootfilename]\n"
 );
 
-int do_tftpb (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
-{
-	return netboot_common (TFTP, cmdtp, argc, argv);
-}
-
-U_BOOT_CMD(
-	tftpboot,	3,	1,	do_tftpb,
-	"tftpboot- boot image via network using TFTP protocol\n",
-	"[loadAddress] [bootfilename]\n"
-);
-
 int do_rarpb (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 {
 	return netboot_common (RARP, cmdtp, argc, argv);
@@ -65,6 +56,17 @@ int do_rarpb (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 U_BOOT_CMD(
 	rarpboot,	3,	1,	do_rarpb,
 	"rarpboot- boot image via network using RARP/TFTP protocol\n",
+	"[loadAddress] [bootfilename]\n"
+);
+#endif /* #ifndef COMPRESSED_UBOOT */
+int do_tftpb (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+{
+	return netboot_common (TFTP, cmdtp, argc, argv);
+}
+
+U_BOOT_CMD(
+	tftpboot,	3,	1,	do_tftpb,
+	"tftpboot- boot image via network using TFTP protocol\n",
 	"[loadAddress] [bootfilename]\n"
 );
 

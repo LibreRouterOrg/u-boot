@@ -4,6 +4,8 @@
  * Wolfgang Denk, wd@denx.de
  * All rights reserved.
  *
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of
@@ -137,6 +139,7 @@ table_entry_t comp_name[] = {
     {	IH_COMP_NONE,	"none",		"uncompressed",		},
     {	IH_COMP_BZIP2,	"bzip2",	"bzip2 compressed",	},
     {	IH_COMP_GZIP,	"gzip",		"gzip compressed",	},
+    {   IH_COMP_LZMA,   "lzma",         "lzma compressed",      },
     {	-1,		"",		"",			},
 };
 

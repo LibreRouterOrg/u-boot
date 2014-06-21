@@ -2,6 +2,8 @@
  * (C) Copyright 2000-2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
+ *
  * See file CREDITS for list of people who contributed to this
  * project.
  *
@@ -28,10 +30,10 @@
 #include <command.h>
 #include <net.h>
 
-#if defined(CONFIG_I386)
+#if defined(CONFIG_I386) || defined(CONFIG_MIPS)
 DECLARE_GLOBAL_DATA_PTR;
 #endif
-
+#ifndef COMPRESSED_UBOOT
 int do_go (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 {
 	ulong	addr, rc;
@@ -58,7 +60,12 @@ int do_go (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 	argv[0] = (char *)gd;
 #endif
 #if !defined(CONFIG_NIOS)
-	rc = ((ulong (*)(int, char *[]))addr) (--argc, &argv[1]);
+	if (argc > 2 && argv[2][0] == 'b') {
+		printf ("## Board info at 0x%08lX ...\n", gd->bd);
+		rc = ((ulong (*)(int, int, int, int))addr)(gd->bd, 0, 0, 0);
+	} else {
+		rc = ((ulong (*)(int, char *[]))addr) (--argc, &argv[1]);
+	}
 #else
 	/*
 	 * Nios function pointers are address >> 1
@@ -79,7 +86,7 @@ U_BOOT_CMD(
 	"addr [arg ...]\n    - start application at address 'addr'\n"
 	"      passing 'arg' as arguments\n"
 );
-
+#endif /* #ifndef COMPRESSED_UBOOT */
 extern int do_reset (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[]);
 
 U_BOOT_CMD(

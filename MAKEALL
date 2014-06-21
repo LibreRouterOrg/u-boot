@@ -228,7 +228,10 @@ LIST_mips5kc="purple"
 
 LIST_au1xx0="dbau1000 dbau1100 dbau1500 dbau1550 dbau1550_el"
 
-LIST_mips="${LIST_mips4kc} ${LIST_mips5kc} ${LIST_au1xx0}"
+LIST_mips24k="ar7100"
+
+LIST_mips="${LIST_mips4kc} ${LIST_mips5kc} ${LIST_au1xx0} ${LIST_MIPS24k}"
+
 
 #########################################################################
 ## MIPS Systems		(little endian)

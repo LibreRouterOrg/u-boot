@@ -2,6 +2,8 @@
  * (C) Copyright 2000-2004
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
+ *
  * See file CREDITS for list of people who contributed to this
  * project.
  *
@@ -431,6 +433,7 @@ int  his_pad_count;  /* number of pad chars he needs */
 char his_pad_char;   /* pad chars he needs */
 char his_quote;      /* quote chars he'll use */
 
+#ifndef COMPRESSED_UBOOT
 int do_load_serial_bin (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 {
 	ulong offset = 0;
@@ -523,6 +526,7 @@ int do_load_serial_bin (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 #endif
 	return rcode;
 }
+#endif /* #ifndef COMPRESSED_UBOOT */
 
 
 static ulong load_serial_bin (ulong offset)

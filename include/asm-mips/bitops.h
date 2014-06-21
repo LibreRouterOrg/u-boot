@@ -5,6 +5,7 @@
  *
  * Copyright (c) 1994 - 1997, 1999, 2000  Ralf Baechle (ralf@gnu.org)
  * Copyright (c) 2000  Silicon Graphics, Inc.
+ * Copyright (c) 2013 Qualcomm Atheros, Inc.
  */
 #ifndef _ASM_BITOPS_H
 #define _ASM_BITOPS_H
@@ -794,7 +795,7 @@ extern int find_first_zero_bit (void *addr, unsigned size);
 #endif /* (__MIPSEB__) */
 
 /* Now for the ext2 filesystem bit operations and helper routines. */
-
+#if (CONFIG_COMMANDS & CFG_CMD_EXT2)
 #ifdef __MIPSEB__
 extern __inline__ int ext2_set_bit(int nr, void * addr)
 {
@@ -908,5 +909,6 @@ found_middle:
 #define minix_test_and_clear_bit(nr,addr) test_and_clear_bit(nr,addr)
 #define minix_test_bit(nr,addr) test_bit(nr,addr)
 #define minix_find_first_zero_bit(addr,size) find_first_zero_bit(addr,size)
+#endif /* (CONFIG_COMMANDS & CFG_CMD_EXT2) */
 
 #endif /* _ASM_BITOPS_H */
