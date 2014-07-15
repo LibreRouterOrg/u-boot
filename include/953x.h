@@ -4164,7 +4164,7 @@
 #define __cpu_hz_25(pll)	(__nint_to_mhz(CPU_PLL_CONFIG_NINT_GET(pll), 25))
 
 /* Since the count is incremented every other tick, divide by 2 */
-#define CFG_HZ			(__cpu_hz_40(CPU_PLL_CONFIG_NINT_VAL) / 2)
+#define CFG_HZ			(__cpu_hz_25(CPU_PLL_CONFIG_NINT_VAL) / 2)
 
 /* SGMII DEFINES */
 
