@@ -231,6 +231,15 @@ void athrs17_vlan_config()
 
 void athrs17_reg_init_wan(void)
 {
+	uint32_t sgmii_ctrl_value;
+
+	/* SGMII control reg value based on switch id  */
+	if ((athrs17_reg_read(S17_MASK_CTRL_REG) & 0xFFFF) == S17C_DEVICEID){
+		sgmii_ctrl_value = 0xc74164de;
+	}else{
+		sgmii_ctrl_value = 0xc74164d0;
+	}
+
 
 #ifdef ATH_S17_MAC0_SGMII
 	athrs17_reg_write(S17_P6PAD_MODE_REG,0x07600000);
@@ -240,7 +249,7 @@ void athrs17_reg_init_wan(void)
            athrs17_reg_read(S17_P6PAD_MODE_REG)|S17_MAC6_SGMII_EN);
 #endif
 	athrs17_reg_write(S17_P6STATUS_REG, S17_PORT_STATUS_AZ_DEFAULT);
-	athrs17_reg_write(S17_SGMII_CTRL_REG , 0xc74164d0); /* SGMII control */
+	athrs17_reg_write(S17_SGMII_CTRL_REG , sgmii_ctrl_value); /* SGMII control */
          
         athrs17_vlan_config();
 	printf("%s done\n",__func__);
@@ -271,7 +280,7 @@ void athrs17_reg_init()
 	if (is_drqfn()) {
 		athrs17_reg_write(S17_P0PAD_MODE_REG, S17_MAC0_SGMII_EN);
 		athrs17_reg_write(S17_SGMII_CTRL_REG , sgmii_ctrl_value); /* SGMII control  */
-    } else {
+	} else {
 		athrs17_reg_write(S17_GLOFW_CTRL1_REG,	0x7f7f7f7f);
 		/* 
                  * If defined S17 Mac0 sgmii val of 0x4(S17_P0PAD_MODE_REG)
@@ -282,10 +291,10 @@ void athrs17_reg_init()
 #else
 		athrs17_reg_write(S17_P0PAD_MODE_REG,	0x07680000);
 #endif
-		athrs17_reg_write(S17_P6PAD_MODE_REG,	0x01000000);		
+		athrs17_reg_write(S17_P6PAD_MODE_REG,	0x01000000);
 	}
 #endif	/* CFG_ATH_GMAC_NMACS == 1 */
-	
+
 /*
  * Values suggested by the swich team when s17 in sgmii configuration
  * operates in forced mode.
@@ -314,7 +323,7 @@ void athrs17_reg_init()
 	athrs17_reg_write(S17_P6PAD_MODE_REG, S17_MAC6_RGMII_EN | S17_MAC6_RGMII_TXCLK_DELAY | \
                               S17_MAC6_RGMII_RXCLK_DELAY | (1 << S17_MAC6_RGMII_TXCLK_SHIFT) | \
                               (2 << S17_MAC6_RGMII_RXCLK_SHIFT));
-	athrs17_reg_write(S17_P6STATUS_REG, 0x7e);	
+	athrs17_reg_write(S17_P6STATUS_REG, 0x7e);
         athrs17_vlan_config();
 #endif
 	athr17_init_flag = 1;
@@ -372,7 +381,7 @@ athrs17_phy_setup(int ethUnit)
 
 	/* See if there's any configuration data for this enet */
 	/* start auto negogiation on each phy */
-	if (is_drqfn()) 
+	if (is_drqfn())
 		ethUnit=0;
 	for (phyUnit=0; phyUnit < ATHR_PHY_MAX; phyUnit++) {
 		if (!ATHR_IS_ETHUNIT(phyUnit, ethUnit)) {
