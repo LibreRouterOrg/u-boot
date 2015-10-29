@@ -287,6 +287,26 @@ pci_init_board (void)
 
 #endif 
 
+#if defined(CONFIG_MACH_QCA956x) || defined(CONFIG_MACH_QCA953x)
+	prmsg("Power up PLL with outdiv = 0 then switch to 3\n");
+
+	ath_reg_wr(PCIE_DPLL3_ADDRESS, PCIE_DPLL3_LOCAL_PLL_PWD_SET(0x1));
+	ath_reg_rmw_clear(PCIE_PLL_CONFIG_ADDRESS, PCIE_PLL_CONFIG_PLLPWD_SET(1));
+	ath_reg_rmw_clear(PCIE_PLL_CONFIG_ADDRESS, PCIE_PLL_CONFIG_BYPASS_SET(1));
+	ath_reg_wr(PCIE_DPLL1_ADDRESS, PCIE_DPLL1_REFDIV_SET(0x1) |
+		PCIE_DPLL1_NINT_SET(0x18));
+	ath_reg_wr(PCIe_DPLL2_ADDRESS, PCIe_DPLL2_LOCAL_PLL_SET(0x1) |
+		PCIe_DPLL2_KD_SET(0x4) |
+		PCIe_DPLL2_PLL_PWD_SET(0x1) |
+		PCIe_DPLL2_PHASE_SHIFT_SET(0x6));
+
+	ath_reg_wr(PCIE_DPLL3_ADDRESS, PCIE_DPLL3_RESET);
+	ath_reg_wr(PCIe_DPLL2_ADDRESS, PCIe_DPLL2_LOCAL_PLL_SET(0x1) |
+		PCIe_DPLL2_KD_SET(0x4) |
+		PCIe_DPLL2_PLL_PWD_SET(0x1) |
+		PCIe_DPLL2_OUTDIV_SET(0x3) |
+		PCIe_DPLL2_PHASE_SHIFT_SET(0x6));
+#else
 	ath_reg_wr_nf(PCIE_PLL_CONFIG_ADDRESS,
 		PCIE_PLL_CONFIG_REFDIV_SET(1) |
 		PCIE_PLL_CONFIG_BYPASS_SET(1) |
@@ -296,6 +316,7 @@ pci_init_board (void)
 	ath_reg_rmw_clear(PCIE_PLL_CONFIG_ADDRESS, PCIE_PLL_CONFIG_PLLPWD_SET(1));
 	udelay(1000);
 	ath_reg_rmw_clear(PCIE_PLL_CONFIG_ADDRESS, PCIE_PLL_CONFIG_BYPASS_SET(1));
+#endif
 	udelay(1000);
 
 #if !defined(CONFIG_MACH_QCA956x)
