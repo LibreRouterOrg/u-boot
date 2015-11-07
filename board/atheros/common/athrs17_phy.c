@@ -234,9 +234,9 @@ void athrs17_reg_init_wan(void)
 	uint32_t sgmii_ctrl_value;
 
 	/* SGMII control reg value based on switch id  */
-	if ((athrs17_reg_read(S17_MASK_CTRL_REG) & 0xFFFF) == S17C_DEVICEID){
+	if ((athrs17_reg_read(S17_MASK_CTRL_REG) & 0xFFFF) >= S17C_V1_DEVICEID) {
 		sgmii_ctrl_value = 0xc74164de;
-	}else{
+	} else {
 		sgmii_ctrl_value = 0xc74164d0;
 	}
 
@@ -263,12 +263,12 @@ void athrs17_reg_init()
 	/* if using header for register configuration, we have to     */
 	/* configure s17 register after frame transmission is enabled */
 
-	if ((athrs17_reg_read(S17_MASK_CTRL_REG) & 0xFFFF) == S17C_DEVICEID){
+	if ((athrs17_reg_read(S17_MASK_CTRL_REG) & 0xFFFF) >= S17C_V1_DEVICEID) {
 		sgmii_ctrl_value = 0xc74164de;
-	}else{
+	} else {
 		sgmii_ctrl_value = 0xc74164d0;
 	}
-	if (athr17_init_flag){
+	if (athr17_init_flag) {
 		return;
 	}
 
@@ -318,6 +318,17 @@ void athrs17_reg_init()
 			phy_reg_write(0, phy_addr, 0x1e, 0x68a0);
 		}
 	}
+
+	/* AR8337/AR8334 v1.0 fixup */
+	if ((athrs17_reg_read(0x0) & 0xffff) == S17C_V1_DEVICEID) {
+		for (phy_addr = 0x0; phy_addr <= ATHR_PHY_MAX; phy_addr++) {
+			/* Turn On Gigabit Clock */
+			phy_reg_write(0, phy_addr, 0x1d, 0x3d);
+			phy_reg_write(0, phy_addr, 0x1e, 0x6820);
+		}
+		printf("Set up QCA8337 V1.0 fixup\n");
+	}
+
 #if CONFIG_S17_SWMAC6_CONNECTED
         printf ("Configuring Mac6 of s17 to slave scorpion\n");
 	athrs17_reg_write(S17_P6PAD_MODE_REG, S17_MAC6_RGMII_EN | S17_MAC6_RGMII_TXCLK_DELAY | \
