@@ -21,6 +21,7 @@ LIB	= lib$(BOARD).a
 OBJS	=			\
 	$(BOARD).o		\
 	flash.o			\
+	extra.o			\
 	../common/init-955x.o	\
 	../common/serial.o	\
 	../common/ath_pci.o	\
