@@ -320,7 +320,7 @@ NXTARG:		;
 
 		ptr = (unsigned char *)mmap(0, sbuf.st_size,
 					    PROT_READ, MAP_SHARED, ifd, 0);
-		if ((caddr_t)ptr == (caddr_t)-1) {
+		if (ptr == (unsigned char *)MAP_FAILED) {
 			fprintf (stderr, "%s: Can't read %s: %s\n",
 				cmdname, imagefile, strerror(errno));
 			exit (EXIT_FAILURE);
