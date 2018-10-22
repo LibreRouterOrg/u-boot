@@ -31,7 +31,7 @@ extern int ath_ddr_find_size(void);
 #	define args		char *s
 #	define board_str(a)	do {			\
 	char ver[] = "0";				\
-	strcpy(s, a " - Scorpion 1.");			\
+	strcpy(s, a " - LibreRouter 1.");			\
 	ver[0] += ath_reg_rd(RST_REVISION_ID_ADDRESS)	\
 						& 0xf;	\
 	strcat(s, ver);					\
@@ -40,7 +40,7 @@ extern int ath_ddr_find_size(void);
 #	define prmsg	printf
 #	define args		void
 #	define board_str(a)				\
-	printf(a " - Scorpion 1.%d", ath_reg_rd		\
+	printf(a " - LibreRouter 1.%d", ath_reg_rd		\
 			(RST_REVISION_ID_ADDRESS) & 0xf)
 #endif
 
