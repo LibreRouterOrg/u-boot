@@ -9,5 +9,11 @@ export PATH=$PATH:/path/to/XXX/openwrt-sdk-18.06.1-ar71xx-generic_gcc-7.3.0_musl
 
 # build 
 make ap135_config
-STAGING_DIR= CROSS_COMPILE=mips-openwrt-linux-musl- make V=1
+LC_ALL=C STAGING_DIR= CROSS_COMPILE=mips-openwrt-linux-musl- make V=1
+
+Troubleshooting
+---------------
+
+If you have this error: locale _nl_intern_locale_data: Assertion `cnt < (sizeof (_nl_value_type_LC_TIME) / sizeof (_nl_value_type_LC_TIME[0]))' failed.
+export LC_ALL=C before building
 
