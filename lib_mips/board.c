@@ -119,7 +119,8 @@ static int init_func_ram (void)
 static int display_banner(void)
 {
 
-	printf ("\n\n%s\n\n", version_string);
+	debug ("\n\n%s\n", version_string);
+	debug ("%s\n\n", version_string);
 
 	return (0);
 }
