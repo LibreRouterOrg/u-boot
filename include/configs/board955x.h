@@ -158,12 +158,10 @@
 #	define ATH_K_CMD		nand_gen_cmd(lk, ATH_K_ADDR, ATH_K_FILE, 0x140000)
 #	define ATH_EXTRA_ENV		"bootdevice=0\0"
 #else
-#	define ATH_F_FILE		fs_name(${bc}-jffs2)
-#	define ATH_F_LEN		0x630000
+#	define CFG_ENV_ADDR		0x9f040000
 #	define ATH_F_ADDR		0x9f050000
-#	define ATH_K_FILE		vmlinux${bc}.lzma.uImage
-#	define ATH_K_ADDR		0x9f680000
-#	define MTDPARTS_DEFAULT		"mtdparts=ath-nor0:256k(u-boot),64k(u-boot-env),6336k(rootfs),1408k(uImage)," ATH_MTDPARTS_MIB0 ",64k(ART)"
+#	define MTDPARTS_DEFAULT		"mtdparts=spi0.0:256k(u-boot),64k(u-boot-env),32384k(firmware),64k(ART)"
+#	define CONFIG_BOOTCOMMAND	"bootm " STR(ATH_F_ADDR)
 #endif /*CONFIG_MI124*/
 
 #ifndef ATH_ROOT_DEV
@@ -204,15 +202,6 @@
  */
 #define CFG_INIT_SP_OFFSET	0x1000
 #define CFG_INIT_SRAM_SP_OFFSET	0xbd007000
-
-#ifdef CONFIG_ATH_NAND_SUPPORT
-#	define CONFIG_BOOTCOMMAND	"nboot 0x81000000 0 0x80000"
-#else
-#	define CFG_ENV_ADDR		0x9f040000
-#	define CONFIG_BOOTCOMMAND	"bootm 0x9f680000"
-#endif
-
-
 
 #ifdef ENABLE_DYNAMIC_CONF
 #define CFG_DDR_MAGIC		0xaabacada
