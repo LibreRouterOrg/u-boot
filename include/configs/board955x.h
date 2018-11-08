@@ -164,28 +164,8 @@
 #	define CONFIG_BOOTCOMMAND	"bootm " STR(ATH_F_ADDR)
 #endif /*CONFIG_MI124*/
 
-#ifndef ATH_ROOT_DEV
-#	define ATH_ROOT_DEV	"31:02"
-#endif
-
-#ifndef ATH_EXTRA_ENV
-#	define ATH_EXTRA_ENV
-#endif
-
-#ifndef ATH_U_CMD
-#	define ATH_U_CMD	gen_cmd(lu, 0x9f000000, ATH_U_FILE)
-#endif
-
-#ifndef ATH_F_CMD
-#	define ATH_F_CMD	gen_cmd_el(lf, ATH_F_ADDR, ATH_F_FILE, ATH_F_LEN)
-#endif
-
-#ifndef ATH_K_CMD
-#	define ATH_K_CMD	gen_cmd(lk, ATH_K_ADDR, ATH_K_FILE)
-#endif
-
 #define CONFIG_EXTRA_ENV_SETTINGS	\
-	"dir=\0" ATH_U_CMD ATH_F_CMD ATH_K_CMD ""
+	"dir=\0"
 
 #define	CONFIG_BOOTARGS		"console=ttyS0,115200 root=" ATH_ROOT_DEV " rootfstype=jffs2 init=/sbin/init " MTDPARTS_DEFAULT
 
