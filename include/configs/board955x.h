@@ -167,7 +167,9 @@
 #define CONFIG_EXTRA_ENV_SETTINGS	\
 	"dir=\0"
 
-#define	CONFIG_BOOTARGS		"console=ttyS0,115200 root=" ATH_ROOT_DEV " rootfstype=jffs2 init=/sbin/init " MTDPARTS_DEFAULT
+#define LINUX_BOARD_NAME "LIBREROUTERV1"
+
+#define CONFIG_BOOTARGS		"console=ttyS0,115200 board=" LINUX_BOARD_NAME " rootfstype=squashfs noinitrd " MTDPARTS_DEFAULT
 
 //#define CFG_PLL_FREQ    CFG_PLL_720_600_200
 
