@@ -2989,8 +2989,8 @@ endif
 ifneq ($(findstring $(BUILD_CONFIG), _ap132),)
 CFG_BOARD_TYPE=ap132
 endif
-ifneq ($(findstring $(BUILD_CONFIG), _ap135),)
-CFG_BOARD_TYPE=ap135
+ifneq ($(findstring $(BUILD_CONFIG), _LibreRouter-1.0),)
+CFG_BOARD_TYPE=LibreRouter-1.0
 endif
 endif #}
 
@@ -3044,7 +3044,7 @@ endif
 ifneq (,$(findstring _s17,$(ETH_CONFIG))) #{
 	@echo '#define CONFIG_ATHRS17_PHY	1'	>>include/config.h
 
-ifneq (,$(findstring $(CFG_BOARD_TYPE),ap136 ap135)) #{
+ifneq (,$(findstring $(CFG_BOARD_TYPE),ap136 LibreRouter-1.0)) #{
 	@echo '#define CFG_ATH_GMAC_NMACS	2'	>>include/config.h
 	@echo '#define CFG_ATH_GE1_IS_CONNECTED 1' 	>>include/config.h
 	@echo '#define CONFIG_ATHRS_GMAC_SGMII  1'      >>include/config.h
@@ -3131,11 +3131,10 @@ ifdef FLASH_SIZE
 endif
 	@./mkconfig -a board955x mips mips board955x atheros
 
-ap135_config: 	unconfig
+LibreRouter-1.0_config: 	unconfig
 	@echo '#define CONFIG_ATHEROS		1'	>include/config.h
 	@echo '#define CONFIG_MACH_QCA955x	1'	>>include/config.h
 	@echo '#define CFG_INIT_STACK_IN_SRAM	1'	>>include/config.h
-	@echo '#define CONFIG_'`echo $(CFG_BOARD_TYPE) | tr [a-z] [A-Z] | sed s/-/_/g`'	1' >>include/config.h
 	@echo '#define __CONFIG_BOARD_NAME $(CFG_BOARD_TYPE)' >>include/config.h
 	@echo '#define CONFIG_BOARD_NAME "$(CFG_BOARD_TYPE)"' >>include/config.h
 ifdef pll
@@ -3153,7 +3152,7 @@ endif
 ifneq (,$(findstring _s17,$(ETH_CONFIG))) #{
 	@echo '#define CONFIG_ATHRS17_PHY	1'	>>include/config.h
 
-ifneq (,$(findstring $(CFG_BOARD_TYPE),ap136 ap135)) #{
+ifneq (,$(findstring $(CFG_BOARD_TYPE),ap136 LibreRouter-1.0)) #{
 	@echo '#define CFG_ATH_GMAC_NMACS	2'	>>include/config.h
 	@echo '#define CFG_ATH_GE1_IS_CONNECTED 1' 	>>include/config.h
 	@echo '#define CONFIG_ATHRS_GMAC_SGMII  1'      >>include/config.h
