@@ -10,13 +10,7 @@ cd "${1:-.}" || usage
 
 # Check for git and a git repo.
 if head=`git rev-parse --verify HEAD 2>/dev/null`; then
-	# Do we have an untagged version?
-	if  [ "`git name-rev --tags HEAD`" = "HEAD undefined" ]; then
-		printf '%s%s' -g `echo "$head" | cut -c1-8`
-	fi
-
-	# Are there uncommitted changes?
-	if git diff-files | read dummy; then
-		printf '%s' -dirty
-	fi
+    git describe --long --tags --dirty --always
+else
+    echo 'unknown'
 fi

@@ -252,8 +252,7 @@ $(LIBS_BOOTSTRAP):
 endif
 
 version:
-		@echo -n "#define U_BOOT_VERSION \"U-Boot " > $(VERSION_FILE); \
-		echo -n "$(U_BOOT_VERSION)" >> $(VERSION_FILE); \
+		@echo -n "#define U_BOOT_VERSION \"LR-U-Boot " > $(VERSION_FILE); \
 		echo -n $(shell $(CONFIG_SHELL) $(TOPDIR)/tools/setlocalversion \
 			 $(TOPDIR)) >> $(VERSION_FILE); \
 		echo "\"" >> $(VERSION_FILE)
