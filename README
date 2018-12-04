@@ -18,3 +18,14 @@ $ tar xf openwrt-sdk-18.06.1-ar71xx-generic_gcc-7.3.0_musl.Linux-x86_64.tar.xz
 
 Run the build command passing the path to the toolchain's bin directory, for example:
 ./build.sh ~/Downloads/openwrt-sdk-18.06.1-ar71xx-generic_gcc-7.3.0_musl.Linux-x86_64/staging_dir/toolchain-mips_24kc_gcc-7.3.0_musl/bin/
+
+Flashing instructions
+---------------------
+
+Connect the LibreRouter to a PC using a serial adapter (TTL voltage) and ETH cable (default u-boot ip address is 192.168.1.1).
+Turn on the device and stop the bootloader sending any key through the serial interface.
+
+ tftp 82000000 lr-u-boot-v1.0.0.bin
+ erase 1:0-4
+ cp.b 0x82000000 0x9f000000 0x30000
+ reset
