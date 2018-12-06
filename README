@@ -25,7 +25,16 @@ Flashing instructions
 Connect the LibreRouter to a PC using a serial adapter (TTL voltage) and ETH cable (default u-boot ip address is 192.168.1.1).
 Turn on the device and stop the bootloader sending any key through the serial interface.
 
- tftp 82000000 lr-u-boot-v1.0.0.bin
- erase 1:0-4
- cp.b 0x82000000 0x9f000000 0x30000
- reset
+To upgrade u-boot:
+
+ath> tftp 82000000 lr-u-boot-v1.0.0.bin
+ath> erase 1:0-4
+ath> cp.b 0x82000000 0x9f000000 0x30000
+ath> reset
+
+To flash a firmware:
+
+ath> tftp 82000000 openwrt-ar71xx-generic-librerouter-v1-squashfs-sysupgrade.bin
+ath> erase 0x9f050000 +$filesize
+ath> cp.b 0x82000000 0x9f050000 $filesize
+ath> boot
