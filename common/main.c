@@ -400,6 +400,19 @@ void main_loop (void)
 	}
 	else
 #endif /* CONFIG_BOOTCOUNT_LIMIT */
+
+/* Store environment to flash if the env in flash is not initialized (on first boot)
+ *  This simplifies the bootstraping in the factory and modifications from
+ *  linux without using the serial interface nor having to know from linux which
+ *  variables should be in the environment.
+ */
+    if (getenv ("fromflash") == NULL) {
+        puts ("Envirnoment not saved in flash or 'fromflash' var is not present!\n");
+        puts ("Saving current environment to flash\n");
+        setenv ("fromflash", "1");
+        saveenv();
+    }
+
 		s = getenv ("bootcmd");
        if (!s) {
 #ifdef CONFIG_ROOTFS_FLASH
