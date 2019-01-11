@@ -683,10 +683,11 @@ ath_gmac_mac_addr_loc(void)
 	return ((unsigned char *)BOARDCAL);
 
 #else
-	/* MAC address is store in the 2nd 4k of last sector */
+	/* MAC addresses are stored starting in the first byte of the last sector (ART partition)
+	 * in this order: ETH0 ETH1 WLAN0
+	 */
 	return ((unsigned char *)
-			(KSEG1ADDR(ATH_SPI_BASE) + (4 * 1024) +
-			 flash_info[0].size - (64 * 1024) /* sector_size */ ));
+			(KSEG1ADDR(ATH_SPI_BASE) + flash_info[0].size - (64 * 1024) /* sector_size */ ));
 #endif
 }
 
