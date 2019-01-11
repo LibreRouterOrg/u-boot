@@ -160,7 +160,7 @@
 #else
 #	define CFG_ENV_ADDR		0x9f040000
 #	define ATH_F_ADDR		0x9f050000
-#	define MTDPARTS_DEFAULT		"mtdparts=spi0.0:256k(u-boot),64k(u-boot-env),16000k(firmware),64k(ART)"
+#	define MTDPARTS_DEFAULT		"mtdparts=spi0.0:256k(u-boot),64k(u-boot-env),7936k(firmware),7936k(fw2),128k(res),64k(ART)"
 #	define CONFIG_BOOTCOMMAND	"bootm " STR(ATH_F_ADDR)
 #endif /*CONFIG_MI124*/
 
