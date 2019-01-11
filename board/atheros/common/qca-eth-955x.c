@@ -725,7 +725,8 @@ static void ath_gmac_get_ethaddr(struct eth_device *dev)
 	}
 #endif  /* CONFIG_ATH_NAND_BR */
 	/* Use fixed address if the above address is invalid */
-	if (mac[0] != 0x00 || (mac[0] == 0xff && mac[5] == 0xff))
+	if (mac[0] == 0xff && mac[1] == 0xff && mac[2] == 0xff && \
+		mac[3] == 0xff && mac[4] == 0xff && mac[5] == 0xff)
 #else
 	if (1)
 #endif
